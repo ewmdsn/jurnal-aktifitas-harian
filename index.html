@@ -36,7 +36,8 @@
     <div class="nav-tabs-wrapper">
         <div class="container">
             <div class="nav-tabs">
-                <button class="nav-tab-btn active" data-tab="jurnal-kerja">📋 Jurnal Kerja</button>
+                <button class="nav-tab-btn active" data-tab="summary-jadwal">🌟 Jadwal Terpadu & Summary</button>
+                <button class="nav-tab-btn" data-tab="jurnal-kerja">📋 Jurnal Kerja</button>
                 <button class="nav-tab-btn tab-bio" data-tab="log-biologis">🧬 Log Biologis & Checklist</button>
                 <button class="nav-tab-btn tab-bio" data-tab="menu-makan">🍽️ Jadwal & Menu Makan</button>
                 <button class="nav-tab-btn tab-bio" data-tab="jadwal-latihan">🏋️ Jadwal & Metode Latihan</button>
@@ -52,9 +53,143 @@
     <main class="container">
 
         <!-- ======================================================== -->
-        <!-- TAB 1: JURNAL KERJA (TIMESHEET)                          -->
+        <!-- TAB UTAMA: RINGKASAN JADWAL TERPADU & SUMMARY (DEPAN)    -->
         <!-- ======================================================== -->
-        <section id="tab-jurnal-kerja" class="tab-content active">
+        <section id="tab-summary-jadwal" class="tab-content active">
+            <!-- Filter Tanggal & Status Hari -->
+            <div class="card" style="margin-bottom: 20px; border-left: 5px solid var(--primary-navy);">
+                <div class="header-control-row" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                            <h2 style="font-size: 1.3rem; font-weight: 800; color: var(--primary-navy); margin: 0;">📅 Dashboard Jadwal Terpadu Harian</h2>
+                            <span class="badge badge-success" id="summary-badge-fase">Fase 2 & 3: Remodeling Otot-Tulang</span>
+                        </div>
+                        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">
+                            Menggabungkan seluruh agenda kerja, jadwal latihan fisik & metode, serta jendela nutrisi & ritme biologis dalam satu garis waktu kronologis otomatis.
+                        </p>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                        <button class="btn btn-sm btn-outline" id="btn-summary-prev-day" onclick="window.app.navigateSummaryDay(-1)">◀ Hari Sebelumnya</button>
+                        <input type="date" id="summary-selected-date" class="form-control" style="width: auto; padding: 6px 12px; font-weight: 700;">
+                        <button class="btn btn-sm btn-primary" id="btn-summary-today" onclick="window.app.navigateSummaryToday()">Hari Ini</button>
+                        <button class="btn btn-sm btn-outline" id="btn-summary-next-day" onclick="window.app.navigateSummaryDay(1)">Besok ▶</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- KPI Summary Scorecard Harian -->
+            <div class="kpi-grid" style="margin-bottom: 22px;">
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Agenda Hari Ini</div>
+                    <div class="kpi-value" id="summary-kpi-total-agenda">0</div>
+                    <div class="kpi-subtext" id="summary-kpi-total-subtext">Kerja, Latihan & Nutrisi</div>
+                </div>
+                <div class="kpi-card green">
+                    <div class="kpi-label">Progress Selesai</div>
+                    <div class="kpi-value" id="summary-kpi-selesai">0 / 0 (0%)</div>
+                    <div class="kpi-subtext">Tingkat eksekusi jadwal</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Jam Terjadwal</div>
+                    <div class="kpi-value" id="summary-kpi-total-jam">0.0 Jam</div>
+                    <div class="kpi-subtext">Akumulasi alokasi waktu</div>
+                </div>
+                <div class="kpi-card" id="summary-kpi-card-conflict">
+                    <div class="kpi-label">Status Anti-Bentrokan Jam</div>
+                    <div class="kpi-value" id="summary-kpi-conflict-status">✅ 0 Bentrokan</div>
+                    <div class="kpi-subtext" id="summary-kpi-conflict-subtext">Semua jam teratur rapi</div>
+                </div>
+            </div>
+
+            <!-- Banner Peringatan Bentrokan (Jika Ada) -->
+            <div id="summary-conflict-banner" class="alert alert-danger" style="display: none; margin-bottom: 20px;">
+                <div style="font-size: 24px;">⚠️</div>
+                <div style="flex: 1;">
+                    <h4 style="font-weight: 800; margin-bottom: 4px; color: #991b1b;">Peringatan Bentrokan Jam Terdeteksi!</h4>
+                    <p style="margin: 0; font-size: 0.88rem;" id="summary-conflict-banner-text">Terdapat jadwal kegiatan yang tumpang tindih pada jam yang sama. Silakan sesuaikan jam agar jadwal harian berjalan harmonis.</p>
+                </div>
+                <button class="btn btn-sm btn-danger" onclick="window.app.scrollToFirstConflict()">Tinjau Bentrokan</button>
+            </div>
+
+            <!-- Grid: Master Timeline Terpadu (Kiri) & Summary Report Otomatis (Kanan) -->
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px; align-items: start;" id="summary-main-grid">
+                
+                <!-- KOLOM KIRI: MASTER TIMELINE TERPADU KRONOLOGIS -->
+                <div class="card" style="padding: 20px;">
+                    <div class="card-header" style="border-bottom: 2px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                        <div>
+                            <h3 class="card-title" style="color: var(--primary-navy);">⏱️ Garis Waktu Terpadu (Master Schedule 00.00 – 23.59)</h3>
+                            <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 2px 0 0 0;">Disusun otomatis secara kronologis dari pagi hingga malam</p>
+                        </div>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <button class="btn btn-sm btn-primary" onclick="window.app.openQuickAddTask()">➕ Tambah Kerja</button>
+                            <button class="btn btn-sm btn-green" onclick="window.app.openQuickAddWorkout()">🏋️ Jadwal Latihan</button>
+                        </div>
+                    </div>
+
+                    <!-- Filter Kategori Timeline -->
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px dashed var(--border-color);" id="summary-timeline-filters">
+                        <button class="btn btn-xs btn-primary timeline-filter-btn active" data-filter="all" onclick="window.app.setTimelineFilter('all')">Semua Agenda</button>
+                        <button class="btn btn-xs btn-outline timeline-filter-btn" data-filter="Kerja" onclick="window.app.setTimelineFilter('Kerja')">💼 Kerja Saja</button>
+                        <button class="btn btn-xs btn-outline timeline-filter-btn" data-filter="Latihan" onclick="window.app.setTimelineFilter('Latihan')">🏋️ Latihan Saja</button>
+                        <button class="btn btn-xs btn-outline timeline-filter-btn" data-filter="Nutrisi" onclick="window.app.setTimelineFilter('Nutrisi')">🍽️ Nutrisi Saja</button>
+                        <button class="btn btn-xs btn-outline timeline-filter-btn" data-filter="Biologis" onclick="window.app.setTimelineFilter('Biologis')">🧬 Biologis Saja</button>
+                    </div>
+
+                    <!-- Wadah Master Timeline Terpadu -->
+                    <div id="unified-timeline-container" class="unified-timeline">
+                        <!-- Diisi otomatis oleh JavaScript -->
+                    </div>
+                </div>
+
+                <!-- KOLOM KANAN: EXECUTIVE DAILY SUMMARY REPORT & CATATAN RAPAT -->
+                <div style="display: flex; flex-direction: column; gap: 18px;">
+                    
+                    <!-- Kotak Summary Report Harian Rapi Otomatis -->
+                    <div class="card" style="border-top: 4px solid var(--primary-green); padding: 18px;">
+                        <div class="card-header" style="padding-bottom: 10px; margin-bottom: 12px; border-bottom: 1px solid var(--border-color);">
+                            <h3 class="card-title green" style="font-size: 1.05rem;">📋 Summary Report Harian Otomatis</h3>
+                            <span class="badge badge-success">Eksekutif Rapi</span>
+                        </div>
+                        <div id="daily-summary-report-content" style="font-size: 0.86rem; line-height: 1.6; color: var(--text-primary); background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 14px; white-space: pre-wrap;">
+                            <!-- Diisi dinamis oleh JavaScript -->
+                        </div>
+                        <div style="display: flex; gap: 8px; flex-direction: column;">
+                            <button class="btn btn-sm btn-outline" id="btn-copy-daily-report" onclick="window.app.copyDailySummaryReport()" style="display: flex; align-items: center; justify-content: center; gap: 6px;">
+                                <span>📋 Salin Rapor (Format WhatsApp / Teks)</span>
+                            </button>
+                            <button class="btn btn-sm btn-primary" id="btn-print-daily-report" onclick="window.app.printDailyReport()" style="display: flex; align-items: center; justify-content: center; gap: 6px;">
+                                <span>🖨️ Cetak / Ekspor PDF Rapor Harian</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Checklist Singkat Kepatuhan Rekonstruksi -->
+                    <div class="card" style="border-top: 4px solid var(--accent-orange); padding: 18px;">
+                        <div class="card-header" style="padding-bottom: 8px; margin-bottom: 10px; border-bottom: 1px solid var(--border-color);">
+                            <h4 style="font-weight: 800; font-size: 0.95rem; color: var(--accent-orange); margin: 0;">⚡ Status Protokol Rekonstruksi</h4>
+                        </div>
+                        <div id="summary-quick-checklist" style="font-size: 0.84rem; line-height: 1.7;">
+                            <!-- Diisi dinamis oleh JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- Panduan Cepat Anti-Bentrokan -->
+                    <div class="card" style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 16px;">
+                        <h4 style="font-weight: 800; font-size: 0.88rem; color: #166534; margin-bottom: 6px;">💡 Sistem Pintar Anti-Bentrokan</h4>
+                        <p style="font-size: 0.8rem; color: #15803d; line-height: 1.5; margin: 0;">
+                            Setiap kali Anda menambah tugas kerja atau menjadwalkan latihan, sistem otomatis mengecek apakah jam tersebut sudah terisi oleh kegiatan lain. Jika terjadi tabrakan jam, sistem akan menampilkan dialog peringatan untuk penyesuaian jam.
+                        </p>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+        <!-- ======================================================== -->
+        <!-- TAB 2: JURNAL KERJA (TIMESHEET)                          -->
+        <!-- ======================================================== -->
+        <section id="tab-jurnal-kerja" class="tab-content">
             <!-- KPI Summary Cards -->
             <div class="kpi-grid">
                 <div class="kpi-card">
@@ -455,6 +590,69 @@
                 <span>⚠️ <strong>Protokol Minggu Pertama:</strong> Lakukan dengan intensitas <strong>70% kemampuan</strong> pada 3–4 hari pertama hingga rasa pegal/panas di punggung mereda secara wajar, lalu naikkan ke porsi penuh. Istirahat antar-set: <strong>60 detik</strong>.</span>
             </div>
 
+            <!-- Form Pengaturan Jam & Penjadwalan Latihan -->
+            <div class="card" id="card-form-workout-schedule" style="border-left: 5px solid #7c3aed; background: #ffffff; margin-bottom: 20px;">
+                <div class="card-header">
+                    <div>
+                        <h3 class="card-title" style="color: #6d28d9;">⏰ Atur Jam & Penjadwalan Sesi Latihan Fisik</h3>
+                        <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 3px 0 0 0;">
+                            Pilih tanggal & jam pelaksanaan latihan, tetapkan metode latihan terstandarisasi, dan sinkronkan ke Jadwal Terpadu dengan proteksi anti-bentrokan jam.
+                        </p>
+                    </div>
+                    <span class="badge" style="background: #ede9fe; color: #6d28d9; border: 1px solid #c4b5fd;">🛡️ Anti-Bentrokan Jam Aktif</span>
+                </div>
+                <form id="form-schedule-workout">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">Tanggal Latihan</label>
+                            <input type="date" id="sched-workout-tgl" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Jam Mulai</label>
+                            <input type="time" id="sched-workout-mulai" class="form-control" value="16:30" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Jam Selesai</label>
+                            <input type="time" id="sched-workout-selesai" class="form-control" value="17:15" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Pilihan Sesi Latihan</label>
+                            <select id="sched-workout-sesi" class="form-control" required>
+                                <option value="Sesi A: Dada Bidang, Bahu Lebar & Six-Pack (Push-up, Pike, Lateral)">Sesi A: Dada Bidang, Bahu Lebar & Six-Pack (Push-up, Pike, Lateral)</option>
+                                <option value="Sesi B: Punggung Sayap V-Taper, Bahu Belakang & Bisep (Pull-up, Face-pull)">Sesi B: Punggung Sayap V-Taper, Bahu Belakang & Bisep (Pull-up, Face-pull)</option>
+                                <option value="Sesi C: Kaki Kokoh, Pinggul Stabil & Core Isometrik (Squat, Lunge, Vacuum)">Sesi C: Kaki Kokoh, Pinggul Stabil & Core Isometrik (Squat, Lunge, Vacuum)</option>
+                                <option value="Sesi D: Restorasi Mobilitas, Dekompresi Fasia & Dead Hang">Sesi D: Restorasi Mobilitas, Dekompresi Fasia & Dead Hang</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-grid">
+                        <div class="form-group" style="grid-column: span 2;">
+                            <label class="form-label">Pilihan Metode Latihan (8 Metode Terstandarisasi)</label>
+                            <select id="sched-workout-metode" class="form-control" required>
+                                <option value="Adaptasi 70% Kemampuan (Minggu I - Hindari Failure)">Adaptasi 70% Kemampuan (Minggu I - Hindari Failure)</option>
+                                <option value="Tempo Terkontrol 2-1-1 (Eksentrik Lambat & Kontraksi Puncak)">Tempo Terkontrol 2-1-1 (Eksentrik Lambat & Kontraksi Puncak)</option>
+                                <option value="Isometrik Korset Perut (Stomach Vacuum & Plank Kunci Panggul)">Isometrik Korset Perut (Stomach Vacuum & Plank Kunci Panggul)</option>
+                                <option value="Dekompresi Pasif Fasia (Dead Hang & Child Pose Malam)">Dekompresi Pasif Fasia (Dead Hang & Child Pose Malam)</option>
+                                <option value="Zone 2 Kardio Pemulihan (Jalan Cepat / Sepeda Statis)">Zone 2 Kardio Pemulihan (Jalan Cepat / Sepeda Statis)</option>
+                                <option value="Porsi Penuh 100% & Beban Progresif (Progresi Lanjutan)">Porsi Penuh 100% & Beban Progresif (Progresi Lanjutan)</option>
+                                <option value="Mobilitas Dinamis & Peregangan Sendi (Cobra & Rotasi)">Mobilitas Dinamis & Peregangan Sendi (Cobra & Rotasi)</option>
+                                <option value="Non-Latihan Fisik (Aktivitas Kerja / Harian)">Non-Latihan Fisik (Aktivitas Kerja / Harian)</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="grid-column: span 2;">
+                            <label class="form-label">Target / Catatan Pelaksanaan Sesi</label>
+                            <input type="text" id="sched-workout-catatan" class="form-control" placeholder="Misal: Fokus teknik tempo 2-1-1, istirahat 60 detik antar-set, hidrasi 500ml bertahap" value="Fokus pembentukan V-Taper tanpa kompresi tulang belakang berlebih">
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center; justify-content: flex-end; margin-top: 14px; flex-wrap: wrap;">
+                        <span id="sched-workout-duration-badge" class="badge badge-info" style="font-size: 0.85rem;">Durasi: 0.75 Jam (45 Menit)</span>
+                        <button type="submit" class="btn" style="background: #7c3aed; color: #ffffff;" id="btn-submit-workout-sched">
+                            💾 Simpan Jadwal Latihan & Masukkan ke Timeline
+                        </button>
+                    </div>
+                </form>
+            </div>
+
             <!-- Pemilih Hari Interaktif -->
             <div class="card">
                 <div class="card-header">
@@ -678,6 +876,56 @@
         </section>
 
     </main>
+
+    <!-- ======================================================== -->
+    <!-- MODAL POP-UP PERINGATAN BENTROKAN JAM (ANTI-CONFLICT)     -->
+    <!-- ======================================================== -->
+    <div id="modal-conflict-detector" class="modal-overlay" style="display: none;">
+        <div class="modal-content card" style="max-width: 560px; border-left: 6px solid var(--accent-red); margin: 60px auto; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);">
+            <div style="display: flex; align-items: flex-start; gap: 16px; margin-bottom: 16px;">
+                <div style="width: 50px; height: 50px; border-radius: 50%; background: #fee2e2; color: #dc2626; display: flex; align-items: center; justify-content: center; font-size: 26px; flex-shrink: 0;">
+                    ⚠️
+                </div>
+                <div>
+                    <h3 style="color: #991b1b; font-size: 1.25rem; font-weight: 800; margin: 0;">Bentrokan Jadwal Terdeteksi!</h3>
+                    <p style="font-size: 0.88rem; color: var(--text-secondary); margin-top: 4px;">
+                        Jam kegiatan yang Anda tentukan bertabrakan dengan jadwal yang sudah ada pada tanggal yang sama.
+                    </p>
+                </div>
+            </div>
+
+            <div style="background: #fff1f2; border: 1px solid #fecdd3; border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+                <div style="font-size: 0.82rem; font-weight: 700; color: #9f1239; margin-bottom: 6px;">JADWAL YANG BARU INGIN DISIMPAN:</div>
+                <div style="font-weight: 800; font-size: 0.95rem; color: #881337;" id="conflict-modal-new-title"></div>
+                <div style="font-size: 0.85rem; color: #9f1239; margin-top: 2px;">
+                    ⏰ <span id="conflict-modal-new-time"></span> (<span id="conflict-modal-new-duration"></span>)
+                </div>
+            </div>
+
+            <div style="margin-bottom: 18px;">
+                <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 8px;">JADWAL EKSISTING YANG SUDAH MENGISI JAM TERSEBUT:</div>
+                <div id="conflict-modal-existing-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto;">
+                    <!-- Diisi dinamis -->
+                </div>
+            </div>
+
+            <p style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.4; margin-bottom: 20px;">
+                💡 <em>Saran: Pilih <strong>"Sesuaikan Jam"</strong> untuk mengubah jam agar tidak bentrok, atau pilih <strong>"Tetap Simpan"</strong> jika kegiatan ini memang berlangsung bersamaan (multitasking).</em>
+            </p>
+
+            <div style="display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap;">
+                <button type="button" class="btn btn-outline" id="btn-conflict-adjust" style="border-color: #cbd5e1; font-weight: 700;">
+                    🔄 Sesuaikan Jam (Batal Simpan)
+                </button>
+                <button type="button" class="btn btn-danger" id="btn-conflict-force-save" style="font-weight: 700;">
+                    ⚠️ Tetap Simpan (Multitasking)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="app-toast" style="position: fixed; bottom: 24px; right: 24px; background: #0f172a; color: #ffffff; padding: 12px 20px; border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3); font-size: 0.88rem; font-weight: 600; display: none; z-index: 10000; animation: fadeInModal 0.2s ease;"></div>
 
     <!-- Scripts -->
     <script src="js/data-master.js"></script>

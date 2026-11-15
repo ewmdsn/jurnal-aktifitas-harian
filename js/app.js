@@ -5,10 +5,15 @@ const STORAGE_KEY = 'jurnal_biologis_mandiri_v1';
 class AppManager {
     constructor() {
         this.data = this.loadState();
-        this.currentTab = 'jurnal-kerja';
+        this.currentTab = 'summary-jadwal';
         this.editingTaskId = null;
         this.editingBioLogId = null;
         this.selectedWorkoutDay = 'Senin';
+        const todayStr = new Date().toISOString().split('T')[0];
+        this.selectedSummaryDate = (this.data.tasks && this.data.tasks.some(t => t.tanggal === todayStr))
+            ? todayStr
+            : (this.data.tasks && this.data.tasks.length > 0 ? this.data.tasks[0].tanggal : todayStr);
+        this.timelineFilter = 'all';
         this.init();
     }
 
@@ -163,6 +168,32 @@ class AppManager {
             });
         }
 
+        // Form Submit: Penjadwalan Latihan Fisik
+        const formWorkout = document.getElementById('form-schedule-workout');
+        if (formWorkout) {
+            formWorkout.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.handleScheduleWorkout();
+            });
+        }
+
+        // Auto update durasi pada form jadwal latihan
+        const schedMulai = document.getElementById('sched-workout-mulai');
+        const schedSelesai = document.getElementById('sched-workout-selesai');
+        if (schedMulai) schedMulai.addEventListener('input', () => this.updateWorkoutDurationBadge());
+        if (schedSelesai) schedSelesai.addEventListener('input', () => this.updateWorkoutDurationBadge());
+
+        // Date Picker pada Summary Dashboard
+        const summaryDateInput = document.getElementById('summary-selected-date');
+        if (summaryDateInput) {
+            summaryDateInput.addEventListener('change', (e) => {
+                if (e.target.value) {
+                    this.selectedSummaryDate = e.target.value;
+                    this.renderSummaryDashboard();
+                }
+            });
+        }
+
         // Form Submit: Tambah / Edit Log Biologis
         const formBio = document.getElementById('form-add-bio');
         if (formBio) {
@@ -240,7 +271,9 @@ class AppManager {
             content.classList.toggle('active', content.id === `tab-${tabId}`);
         });
 
-        if (tabId === 'dashboard-kpi') {
+        if (tabId === 'summary-jadwal') {
+            this.renderSummaryDashboard();
+        } else if (tabId === 'dashboard-kpi') {
             this.renderDashboard();
         } else if (tabId === 'menu-makan') {
             this.renderMealTimeline();
@@ -248,7 +281,9 @@ class AppManager {
         } else if (tabId === 'jadwal-latihan') {
             this.renderWorkoutDay(this.selectedWorkoutDay);
             this.renderGerakanKunci();
+            this.renderMetodeCatalog();
             this.renderBatasMedis();
+            this.updateWorkoutDurationBadge();
         } else if (tabId === 'master-protokol') {
             this.renderJendelaRegenerasi();
         } else if (tabId === 'timer-latihan') {
@@ -347,6 +382,99 @@ class AppManager {
         document.getElementById('task-tgl').value = todayStr;
     }
 
+    timeToMinutes(timeStr) {
+        if (!timeStr) return 0;
+        const [h, m] = timeStr.split(':').map(Number);
+        return (h || 0) * 60 + (m || 0);
+    }
+
+    checkConflicts(targetDate, startStr, endStr, excludeId = null) {
+        const startMin = this.timeToMinutes(startStr);
+        let endMin = this.timeToMinutes(endStr);
+        if (endMin <= startMin) endMin += 1440;
+
+        const conflicts = [];
+
+        (this.data.tasks || []).forEach(t => {
+            if (t.tanggal === targetDate && t.id !== excludeId) {
+                const tStart = this.timeToMinutes(t.mulai);
+                let tEnd = this.timeToMinutes(t.selesai);
+                if (tEnd <= tStart) tEnd += 1440;
+
+                // Overlap: startA < endB && endA > startB
+                if (startMin < tEnd && endMin > tStart) {
+                    conflicts.push({
+                        id: t.id,
+                        title: t.aktivitas || 'Aktivitas Kerja',
+                        kategori: t.kategori || 'Kerja',
+                        metode: t.metode_latihan || '',
+                        mulai: t.mulai,
+                        selesai: t.selesai,
+                        durasi: `${t.durasi} Jam`,
+                        source: 'Jurnal Kerja'
+                    });
+                }
+            }
+        });
+
+        return {
+            hasConflict: conflicts.length > 0,
+            conflicts
+        };
+    }
+
+    showConflictModal(newAgenda, conflicts, onForceSave, onAdjust) {
+        const modal = document.getElementById('modal-conflict-detector');
+        if (!modal) {
+            const listText = conflicts.map(c => `• ${c.title} (${c.mulai} - ${c.selesai})`).join('\n');
+            if (confirm(`⚠️ Bentrokan Jadwal Terdeteksi!\nJam ${newAgenda.mulai} - ${newAgenda.selesai} bertabrakan dengan:\n${listText}\n\nTetap simpan jadwal ini?`)) {
+                if (typeof onForceSave === 'function') onForceSave();
+            } else {
+                if (typeof onAdjust === 'function') onAdjust();
+            }
+            return;
+        }
+
+        const titleEl = document.getElementById('conflict-modal-new-title');
+        const timeEl = document.getElementById('conflict-modal-new-time');
+        const durEl = document.getElementById('conflict-modal-new-duration');
+        if (titleEl) titleEl.innerText = newAgenda.title;
+        if (timeEl) timeEl.innerText = `${newAgenda.mulai} - ${newAgenda.selesai}`;
+        if (durEl) durEl.innerText = newAgenda.durasi;
+
+        const listEl = document.getElementById('conflict-modal-existing-list');
+        if (listEl) {
+            listEl.innerHTML = conflicts.map(c => `
+                <div style="background:#ffffff; border:1px solid #fecdd3; border-radius:6px; padding:10px 14px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                    <div>
+                        <div style="font-weight:700; color:#881337; font-size:0.9rem;">${c.title}</div>
+                        <div style="font-size:0.75rem; color:#9f1239;">[${c.source}] ${c.kategori} ${c.metode ? '• ' + c.metode : ''}</div>
+                    </div>
+                    <span class="badge badge-danger" style="font-size:0.8rem; font-weight:800; white-space:nowrap;">⏰ ${c.mulai} - ${c.selesai}</span>
+                </div>
+            `).join('');
+        }
+
+        modal.style.display = 'flex';
+
+        const btnAdjust = document.getElementById('btn-conflict-adjust');
+        const btnForce = document.getElementById('btn-conflict-force-save');
+
+        if (btnAdjust) {
+            btnAdjust.onclick = () => {
+                modal.style.display = 'none';
+                if (typeof onAdjust === 'function') onAdjust();
+            };
+        }
+
+        if (btnForce) {
+            btnForce.onclick = () => {
+                modal.style.display = 'none';
+                if (typeof onForceSave === 'function') onForceSave();
+            };
+        }
+    }
+
     async handleSaveTask() {
         const tgl = document.getElementById('task-tgl').value;
         const mulai = document.getElementById('task-mulai').value;
@@ -360,9 +488,40 @@ class AppManager {
         const fokus = parseInt(document.getElementById('task-fokus').value || '5');
         const catatan = document.getElementById('task-catatan').value;
 
+        if (!tgl || !mulai || !selesai || !aktivitas) {
+            alert('Silakan lengkapi tanggal, jam mulai, jam selesai, dan nama aktivitas.');
+            return;
+        }
+
         const durasi = this.calculateDuration(mulai, selesai);
         const hari = this.getDayName(tgl);
 
+        // Conflict check
+        const conflictCheck = this.checkConflicts(tgl, mulai, selesai, this.editingTaskId);
+        if (conflictCheck.hasConflict) {
+            this.showConflictModal(
+                {
+                    title: aktivitas,
+                    mulai,
+                    selesai,
+                    durasi: `${durasi} Jam`,
+                    kategori: kat
+                },
+                conflictCheck.conflicts,
+                () => {
+                    this.executeSaveTask(tgl, hari, mulai, selesai, durasi, kat, metode, aktivitas, output, prioritas, status, fokus, catatan);
+                },
+                () => {
+                    document.getElementById('task-mulai').focus();
+                }
+            );
+            return;
+        }
+
+        this.executeSaveTask(tgl, hari, mulai, selesai, durasi, kat, metode, aktivitas, output, prioritas, status, fokus, catatan);
+    }
+
+    async executeSaveTask(tgl, hari, mulai, selesai, durasi, kat, metode, aktivitas, output, prioritas, status, fokus, catatan) {
         if (this.editingTaskId) {
             const idx = this.data.tasks.findIndex(t => t.id === this.editingTaskId);
             if (idx >= 0) {
@@ -386,13 +545,14 @@ class AppManager {
                 this.saveState();
                 this.renderTasks();
                 this.renderDashboard();
+                this.renderSummaryDashboard();
 
                 if (window.supabaseService) {
                     await window.supabaseService.upsertTask(updatedTask);
                 }
 
                 this.cancelEditTask();
-                alert('Tugas berhasil diperbarui dan disinkronkan ke Supabase Cloud!');
+                this.showToast('✅ Tugas berhasil diperbarui dan disinkronkan ke Supabase Cloud!');
             }
         } else {
             const newTask = {
@@ -416,6 +576,7 @@ class AppManager {
             this.saveState();
             this.renderTasks();
             this.renderDashboard();
+            this.renderSummaryDashboard();
 
             if (window.supabaseService) {
                 await window.supabaseService.upsertTask(newTask);
@@ -425,7 +586,7 @@ class AppManager {
             const todayStr = new Date().toISOString().split('T')[0];
             document.getElementById('task-tgl').value = todayStr;
 
-            alert('Tugas baru berhasil ditambahkan dan disinkronkan ke Supabase Cloud!');
+            this.showToast('✅ Tugas baru berhasil ditambahkan dan disinkronkan ke Supabase Cloud!');
         }
     }
 
@@ -438,11 +599,150 @@ class AppManager {
             this.saveState();
             this.renderTasks();
             this.renderDashboard();
+            this.renderSummaryDashboard();
 
             if (window.supabaseService) {
                 await window.supabaseService.deleteTask(id);
             }
+            this.showToast('🗑️ Tugas berhasil dihapus.');
         }
+    }
+
+    // =============================================================
+    // FITUR JAM & PENGATURAN JADWAL METODE LATIHAN (TAB 4)
+    // =============================================================
+    updateWorkoutDurationBadge() {
+        const mulai = document.getElementById('sched-workout-mulai')?.value;
+        const selesai = document.getElementById('sched-workout-selesai')?.value;
+        const badge = document.getElementById('sched-workout-duration-badge');
+        if (!badge || !mulai || !selesai) return;
+        const durasi = this.calculateDuration(mulai, selesai);
+        const mins = Math.round(parseFloat(durasi) * 60);
+        badge.innerText = `Durasi: ${durasi} Jam (${mins} Menit)`;
+    }
+
+    handleScheduleWorkout() {
+        const tgl = document.getElementById('sched-workout-tgl').value;
+        const mulai = document.getElementById('sched-workout-mulai').value;
+        const selesai = document.getElementById('sched-workout-selesai').value;
+        const sesi = document.getElementById('sched-workout-sesi').value;
+        const metode = document.getElementById('sched-workout-metode').value;
+        const catatan = document.getElementById('sched-workout-catatan').value;
+
+        if (!tgl || !mulai || !selesai) {
+            alert('Silakan pilih tanggal, jam mulai, dan jam selesai latihan.');
+            return;
+        }
+
+        const durasi = this.calculateDuration(mulai, selesai);
+        const hari = this.getDayName(tgl);
+
+        // Cek anti-bentrokan jam!
+        const conflictCheck = this.checkConflicts(tgl, mulai, selesai, null);
+        if (conflictCheck.hasConflict) {
+            this.showConflictModal(
+                {
+                    title: `${sesi}`,
+                    mulai,
+                    selesai,
+                    durasi: `${durasi} Jam`,
+                    kategori: 'Latihan & Olah Tubuh'
+                },
+                conflictCheck.conflicts,
+                () => {
+                    this.executeSaveWorkout(tgl, hari, mulai, selesai, durasi, sesi, metode, catatan);
+                },
+                () => {
+                    document.getElementById('sched-workout-mulai').focus();
+                }
+            );
+            return;
+        }
+
+        this.executeSaveWorkout(tgl, hari, mulai, selesai, durasi, sesi, metode, catatan);
+    }
+
+    async executeSaveWorkout(tgl, hari, mulai, selesai, durasi, sesi, metode, catatan) {
+        const newWorkoutTask = {
+            id: Date.now().toString(),
+            tanggal: tgl,
+            hari,
+            mulai,
+            selesai,
+            durasi,
+            kategori: 'Latihan & Olah Tubuh',
+            metode_latihan: metode,
+            aktivitas: sesi,
+            output: `Target sesi latihan tuntas (${metode})`,
+            prioritas: 'Tinggi',
+            status: 'Selesai',
+            fokus: 5,
+            catatan: catatan || 'Target rekonstruksi postur V-taper'
+        };
+
+        this.data.tasks.unshift(newWorkoutTask);
+        this.saveState();
+        this.renderTasks();
+        this.renderDashboard();
+        this.renderSummaryDashboard();
+
+        if (window.supabaseService) {
+            await window.supabaseService.upsertTask(newWorkoutTask);
+        }
+
+        this.showToast(`✅ Sesi latihan (${metode}) berhasil dijadwalkan pada ${mulai} - ${selesai}!`);
+        this.switchTab('summary-jadwal');
+    }
+
+    scheduleMetodeWithTime(metodeNama) {
+        this.switchTab('jadwal-latihan');
+
+        const metodeSel = document.getElementById('sched-workout-metode');
+        if (metodeSel) metodeSel.value = metodeNama;
+
+        const mulaiInput = document.getElementById('sched-workout-mulai');
+        const selesaiInput = document.getElementById('sched-workout-selesai');
+        const sesiSel = document.getElementById('sched-workout-sesi');
+
+        if (mulaiInput && selesaiInput) {
+            if (metodeNama.includes('Dekompresi')) {
+                mulaiInput.value = '21:00';
+                selesaiInput.value = '21:30';
+                if (sesiSel) sesiSel.value = 'Sesi D: Restorasi Mobilitas, Dekompresi Fasia & Dead Hang';
+            } else if (metodeNama.includes('Zone 2')) {
+                mulaiInput.value = '06:00';
+                selesaiInput.value = '06:45';
+            } else if (metodeNama.includes('Isometrik')) {
+                mulaiInput.value = '05:45';
+                selesaiInput.value = '06:15';
+            } else {
+                mulaiInput.value = '16:30';
+                selesaiInput.value = '17:15';
+            }
+            this.updateWorkoutDurationBadge();
+        }
+
+        const formCard = document.getElementById('card-form-workout-schedule');
+        if (formCard) {
+            formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            formCard.style.boxShadow = '0 0 0 4px rgba(124, 58, 237, 0.4)';
+            setTimeout(() => {
+                formCard.style.boxShadow = '';
+            }, 2500);
+        }
+
+        this.showToast(`Metode "${metodeNama}" dipilih. Periksa jam & klik Simpan.`);
+    }
+
+    showToast(message) {
+        const toast = document.getElementById('app-toast');
+        if (!toast) return;
+        toast.innerText = message;
+        toast.style.display = 'block';
+        clearTimeout(this.toastTimer);
+        this.toastTimer = setTimeout(() => {
+            toast.style.display = 'none';
+        }, 3500);
     }
 
     // =============================================================
@@ -823,6 +1123,7 @@ class AppManager {
                 <div style="display: flex; gap: 8px; border-top: 1px solid #f1f5f9; padding-top: 10px; flex-wrap: wrap;">
                     <button class="btn btn-sm btn-outline" style="font-size: 0.75rem; flex: 1; min-width: 130px;" onclick="window.app.applyMetodeToTask('${m.nama}')">📝 Pilih untuk Jurnal Kerja</button>
                     <button class="btn btn-sm btn-green" style="font-size: 0.75rem; flex: 1; min-width: 130px;" onclick="window.app.applyMetodeToBio('${m.nama}')">🧬 Pilih untuk Log Biologis</button>
+                    <button class="btn btn-sm" style="font-size: 0.75rem; flex: 1; min-width: 130px; background: #7c3aed; color: #ffffff;" onclick="window.app.scheduleMetodeWithTime('${m.nama}')">⏰ Atur Jam & Jadwalkan</button>
                 </div>
             </div>
         `).join('');
@@ -1070,7 +1371,486 @@ class AppManager {
         }
     }
 
+    // =============================================================
+    // TAB UTAMA (DEPAN): DASHBOARD JADWAL TERPADU & SUMMARY REPORT
+    // =============================================================
+    renderSummaryDashboard() {
+        const dateInput = document.getElementById('summary-selected-date');
+        if (dateInput) {
+            dateInput.value = this.selectedSummaryDate;
+        }
+
+        const dateObj = new Date(this.selectedSummaryDate + 'T00:00:00');
+        const dayName = isNaN(dateObj.getDay()) ? 'Hari' : ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][dateObj.getDay()];
+        const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+        const formattedDate = !isNaN(dateObj.getTime())
+            ? `${dayName}, ${dateObj.getDate()} ${monthNames[dateObj.getMonth()]} ${dateObj.getFullYear()}`
+            : this.selectedSummaryDate;
+
+        // 1. GATHER ALL EVENTS FOR SELECTED DATE
+        const rawTasks = (this.data.tasks || []).filter(t => t.tanggal === this.selectedSummaryDate);
+
+        // Standar rutinitas nutrisi & biologis PDF
+        const bioTemplates = [
+            { id: 'bio-m1', jam: '05:30 - 06:00', mulai: '05:30', selesai: '06:00', durasi: '0.50', kategori: 'Biologis', aktivitas: 'Hidrasi Seluler Garam Himalaya & Stomach Vacuum / Cat-Cow', output: 'Korset perut aktif, dekompresi awal sendi & hidrasi seluler', icon: '🌅', isFixedBio: true },
+            { id: 'bio-m2', jam: '07:00 - 07:30', mulai: '07:00', selesai: '07:30', durasi: '0.50', kategori: 'Nutrisi', aktivitas: 'Sarapan Pembangun: 3 Telur Rebus + Karbo Kompleks & Tumis Hijau', output: 'Asam amino untuk sintesis kolagen tanpa insulin spike berlebih', icon: '🍳', isFixedBio: true },
+            { id: 'bio-m3', jam: '10:00 - 10:30', mulai: '10:00', selesai: '10:30', durasi: '0.50', kategori: 'Nutrisi', aktivitas: 'Hidrasi Antara (500ml) & Selingan Buah / Almond', output: 'Stabilisasi ritme metabolik basal (BMR) & pembaruan epitel usus', icon: '🍏', isFixedBio: true },
+            { id: 'bio-m4', jam: '12:30 - 13:00', mulai: '12:30', selesai: '13:00', durasi: '0.50', kategori: 'Nutrisi', aktivitas: 'Makan Siang Utama: Dada Ayam/Ikan (150g) + Nasi 1 Kepal + Sayur Bening', output: 'Pemicu fase anabolik (mTOR) & regenerasi serabut otot', icon: '🍗', isFixedBio: true },
+            { id: 'bio-m5', jam: '17:30 - 18:00', mulai: '17:30', selesai: '18:00', durasi: '0.50', kategori: 'Nutrisi', aktivitas: 'Nutrisi Pasca-Latihan: 2 Putih Telur + Pisang / Protein Isolate', output: 'Recovery serabut otot cepat serap pasca kontraksi', icon: '🍌', isFixedBio: true },
+            { id: 'bio-m6', jam: '19:00 - 19:30', mulai: '19:00', selesai: '19:30', durasi: '0.50', kategori: 'Nutrisi', aktivitas: 'Makan Malam Cut-Off (Tanpa Karbohidrat / Nasi): Ikan Bakar & Sayur Hijau', output: 'Cut-off makan malam dimulai untuk picu autofagi tidur', icon: '🥗', isFixedBio: true },
+            { id: 'bio-m7', jam: '21:00 - 21:30', mulai: '21:00', selesai: '21:30', durasi: '0.50', kategori: 'Biologis', aktivitas: 'Dekompresi Pasif Fasia: Dead Hang 3x30s & Child Pose Malam', output: 'Meregangkan bantalan tulang belakang & menenangkan sistem saraf simpatis', icon: '🧘', isFixedBio: true },
+            { id: 'bio-m8', jam: '21:45 - 05:30', mulai: '21:45', selesai: '05:30', durasi: '7.75', kategori: 'Biologis', aktivitas: 'Jendela Tidur Optimal & Puncak Pelepasan Hormon HGH (Deep Sleep)', output: 'Pelepasan 70-80% HGH untuk padatkan tulang, tambal otot & bakar lemak visceral', icon: '🌙', isFixedBio: true }
+        ];
+
+        const unifiedEvents = [];
+
+        // Masukkan task user
+        rawTasks.forEach(t => {
+            let catType = 'Kerja';
+            if (t.kategori === 'Latihan & Olah Tubuh') catType = 'Latihan';
+            else if (t.kategori.includes('Nutrisi') || t.kategori.includes('Makan')) catType = 'Nutrisi';
+            else if (t.kategori.includes('Biologis') || t.kategori.includes('Kesehatan')) catType = 'Biologis';
+
+            unifiedEvents.push({
+                id: t.id,
+                mulai: t.mulai,
+                selesai: t.selesai,
+                durasi: t.durasi || this.calculateDuration(t.mulai, t.selesai),
+                kategori: catType,
+                kategoriLabel: t.kategori,
+                aktivitas: t.aktivitas,
+                output: t.output || '',
+                metode_latihan: t.metode_latihan || '',
+                prioritas: t.prioritas || 'Sedang',
+                status: t.status || 'Selesai',
+                fokus: t.fokus || 5,
+                catatan: t.catatan || '',
+                isUserTask: true,
+                icon: catType === 'Kerja' ? '💼' : (catType === 'Latihan' ? '🏋️' : (catType === 'Nutrisi' ? '🍽️' : '🧬'))
+            });
+        });
+
+        // Masukkan ritme biologis jika belum dimasukkan sebagai task user pada jam yang sama
+        bioTemplates.forEach(b => {
+            const hasDuplicate = unifiedEvents.some(u => 
+                (u.kategori === b.kategori) && 
+                Math.abs(this.timeToMinutes(u.mulai) - this.timeToMinutes(b.mulai)) < 25
+            );
+            if (!hasDuplicate) {
+                unifiedEvents.push({
+                    id: b.id,
+                    mulai: b.mulai,
+                    selesai: b.selesai,
+                    durasi: b.durasi,
+                    kategori: b.kategori,
+                    kategoriLabel: b.kategori === 'Nutrisi' ? 'Nutrisi & Hidrasi Terjadwal' : 'Protokol Regenerasi Biologis',
+                    aktivitas: b.aktivitas,
+                    output: b.output,
+                    metode_latihan: b.aktivitas.includes('Dekompresi') ? 'Dekompresi Pasif Fasia (Dead Hang & Child Pose Malam)' : '',
+                    prioritas: 'Tinggi',
+                    status: 'Terjadwal',
+                    fokus: 5,
+                    catatan: 'Rujukan Protokol PDF',
+                    isUserTask: false,
+                    icon: b.icon
+                });
+            }
+        });
+
+        // Urutkan secara kronologis (00:00 -> 23:59)
+        unifiedEvents.sort((a, b) => this.timeToMinutes(a.mulai) - this.timeToMinutes(b.mulai));
+
+        // 2. DETEKSI BENTROKAN JAM ANTAR SELURUH AGENDA HARIAN
+        let totalConflictsCount = 0;
+        for (let i = 0; i < unifiedEvents.length; i++) {
+            unifiedEvents[i].conflictsWith = [];
+            const startA = this.timeToMinutes(unifiedEvents[i].mulai);
+            let endA = this.timeToMinutes(unifiedEvents[i].selesai);
+            if (endA <= startA) endA += 1440;
+
+            for (let j = 0; j < unifiedEvents.length; j++) {
+                if (i === j) continue;
+                const startB = this.timeToMinutes(unifiedEvents[j].mulai);
+                let endB = this.timeToMinutes(unifiedEvents[j].selesai);
+                if (endB <= startB) endB += 1440;
+
+                // Overlap: startA < endB && endA > startB
+                if (startA < endB && endA > startB) {
+                    unifiedEvents[i].conflictsWith.push({
+                        title: unifiedEvents[j].aktivitas,
+                        mulai: unifiedEvents[j].mulai,
+                        selesai: unifiedEvents[j].selesai,
+                        kategori: unifiedEvents[j].kategori
+                    });
+                }
+            }
+
+            if (unifiedEvents[i].conflictsWith.length > 0) {
+                totalConflictsCount++;
+            }
+        }
+
+        // 3. UPDATE SCORECARD METRIK HARIAN
+        const totalAgenda = unifiedEvents.length;
+        const selesaiCount = unifiedEvents.filter(e => e.status === 'Selesai').length;
+        const pctSelesai = totalAgenda > 0 ? Math.round((selesaiCount / totalAgenda) * 100) : 0;
+        const totalHours = unifiedEvents.reduce((acc, cur) => acc + parseFloat(cur.durasi || 0), 0);
+
+        const elTotalAgenda = document.getElementById('summary-kpi-total-agenda');
+        const elTotalSub = document.getElementById('summary-kpi-total-subtext');
+        const elSelesai = document.getElementById('summary-kpi-selesai');
+        const elTotalJam = document.getElementById('summary-kpi-total-jam');
+        const cardConflict = document.getElementById('summary-kpi-card-conflict');
+        const statusConflict = document.getElementById('summary-kpi-conflict-status');
+        const subtextConflict = document.getElementById('summary-kpi-conflict-subtext');
+        const bannerConflict = document.getElementById('summary-conflict-banner');
+        const bannerText = document.getElementById('summary-conflict-banner-text');
+
+        if (elTotalAgenda) elTotalAgenda.innerText = totalAgenda;
+        if (elTotalSub) elTotalSub.innerText = `${rawTasks.length} Tugas Mandiri • ${totalAgenda - rawTasks.length} Ritme Biologis`;
+        if (elSelesai) elSelesai.innerText = `${selesaiCount} / ${totalAgenda} (${pctSelesai}%)`;
+        if (elTotalJam) elTotalJam.innerText = `${totalHours.toFixed(1)} Jam`;
+
+        if (totalConflictsCount === 0) {
+            if (cardConflict) {
+                cardConflict.className = 'kpi-card green';
+                cardConflict.onclick = null;
+            }
+            if (statusConflict) statusConflict.innerText = '✅ 0 Bentrokan';
+            if (subtextConflict) subtextConflict.innerText = 'Semua jam teratur rapi';
+            if (bannerConflict) bannerConflict.style.display = 'none';
+        } else {
+            const numCollisions = Math.ceil(totalConflictsCount / 2);
+            if (cardConflict) {
+                cardConflict.className = 'kpi-card red';
+                cardConflict.style.cursor = 'pointer';
+                cardConflict.onclick = () => this.scrollToFirstConflict();
+            }
+            if (statusConflict) statusConflict.innerText = `⚠️ ${numCollisions} Bentrok Jam`;
+            if (subtextConflict) subtextConflict.innerText = 'Klik untuk melihat jam tumpang tindih';
+            if (bannerConflict) {
+                bannerConflict.style.display = 'flex';
+                if (bannerText) {
+                    bannerText.innerText = `Terdeteksi ${numCollisions} pasangan jadwal yang bertabrakan pada jam yang sama di tanggal ${formattedDate}. Gunakan tombol 'Sesuaikan Jam' pada kartu bertanda merah untuk memisahkan jamnya.`;
+                }
+            }
+        }
+
+        // 4. RENDER TIMELINE TERPADU
+        this.renderSummaryTimeline(unifiedEvents);
+
+        // 5. RENDER DAILY EXECUTIVE SUMMARY REPORT
+        this.renderDailySummaryReport(unifiedEvents, totalAgenda, selesaiCount, pctSelesai, totalHours, totalConflictsCount, formattedDate);
+
+        // 6. RENDER QUICK CHECKLIST
+        this.renderSummaryChecklist();
+    }
+
+    renderSummaryTimeline(unifiedEvents) {
+        const container = document.getElementById('unified-timeline-container');
+        if (!container) return;
+
+        // Apply category filter if active
+        let displayEvents = unifiedEvents;
+        if (this.timelineFilter && this.timelineFilter !== 'all') {
+            displayEvents = unifiedEvents.filter(e => e.kategori === this.timelineFilter);
+        }
+
+        if (displayEvents.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 36px 20px; color: var(--text-muted); background: #f8fafc; border-radius: 10px; border: 1px dashed var(--border-color);">
+                    <div style="font-size: 32px; margin-bottom: 8px;">📭</div>
+                    <div style="font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">Tidak Ada Agenda untuk Filter "${this.timelineFilter}"</div>
+                    <p style="font-size: 0.85rem; margin: 0;">Silakan pilih filter lain atau gunakan tombol "Tambah Kerja" / "Jadwal Latihan" di atas.</p>
+                </div>
+            `;
+            return;
+        }
+
+        const now = new Date();
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        const todayStr = now.toISOString().split('T')[0];
+        const isToday = this.selectedSummaryDate === todayStr;
+
+        container.innerHTML = displayEvents.map(e => {
+            const hasConflict = e.conflictsWith && e.conflictsWith.length > 0;
+            const startMins = this.timeToMinutes(e.mulai);
+            let endMins = this.timeToMinutes(e.selesai);
+            if (endMins <= startMins) endMins += 1440;
+            const isLive = isToday && (currentMinutes >= startMins && currentMinutes <= endMins);
+
+            let catClass = 'cat-kerja';
+            let catBadge = '<span class="badge badge-primary">💼 Kerja</span>';
+            if (e.kategori === 'Latihan') {
+                catClass = 'cat-latihan';
+                catBadge = '<span class="badge" style="background:#ede9fe; color:#6d28d9; border:1px solid #c4b5fd;">🏋️ Latihan</span>';
+            } else if (e.kategori === 'Nutrisi') {
+                catClass = 'cat-nutrisi';
+                catBadge = '<span class="badge badge-warning">🍽️ Nutrisi</span>';
+            } else if (e.kategori === 'Biologis') {
+                catClass = 'cat-biologis';
+                catBadge = '<span class="badge badge-success">🧬 Biologis</span>';
+            }
+
+            let statusBadge = e.status === 'Selesai'
+                ? '<span class="badge badge-success">✓ Selesai</span>'
+                : (e.status === 'Sedang Berjalan' ? '<span class="badge badge-warning">⏳ Sedang Berjalan</span>' : '<span class="badge badge-neutral">Terjadwal</span>');
+
+            let metodeBadge = '';
+            if (e.metode_latihan && !e.metode_latihan.includes('Non-Latihan')) {
+                metodeBadge = `<div style="margin-top: 4px;"><span class="badge" style="background:#f3e8ff; color:#7e22ce; border:1px solid #d8b4fe; font-size:0.75rem; white-space:normal; line-height:1.3;">⚡ Metode: ${e.metode_latihan}</span></div>`;
+            }
+
+            let conflictRibbon = '';
+            if (hasConflict) {
+                const confNames = e.conflictsWith.map(c => `"${c.title}" (${c.mulai}-${c.selesai})`).join(', ');
+                conflictRibbon = `
+                    <div class="conflict-alert-ribbon">
+                        <div>⚠️ <strong>BENTROKAN JAM!</strong> Beririsan dengan ${confNames}</div>
+                        <button class="btn btn-xs" style="background:#ffffff; border:1px solid #f87171; color:#b91c1c; font-weight:700; white-space:nowrap;" onclick="window.app.quickAdjustConflictTime('${e.id}')">✏️ Sesuaikan Jam</button>
+                    </div>
+                `;
+            }
+
+            let liveTag = isLive ? `<span class="live-pill"><span class="live-dot"></span> SEDANG BERLANGSUNG</span>` : '';
+
+            let actionBtns = '';
+            if (e.isUserTask) {
+                actionBtns = `
+                    <div style="display:flex; gap:6px; align-items:center; margin-top:10px; border-top:1px dashed #e2e8f0; padding-top:8px;">
+                        <button class="btn btn-xs ${e.status === 'Selesai' ? 'btn-outline' : 'btn-green'}" onclick="window.app.toggleTaskStatusFromTimeline('${e.id}')">
+                            ${e.status === 'Selesai' ? '↩️ Jadwalkan Lagi' : '✓ Selesaikan'}
+                        </button>
+                        <button class="btn btn-xs btn-outline" onclick="window.app.startEditTask('${e.id}')">✏️ Edit</button>
+                        <button class="btn btn-xs btn-danger" onclick="window.app.deleteTask('${e.id}')">🗑️</button>
+                    </div>
+                `;
+            } else {
+                actionBtns = `
+                    <div style="display:flex; gap:6px; align-items:center; margin-top:10px; border-top:1px dashed #e2e8f0; padding-top:8px; font-size:0.75rem; color:var(--text-secondary);">
+                        <span>📖 Rujukan Protokol PDF • Jadwal Standar</span>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="timeline-item">
+                    <div class="timeline-time-col">
+                        <div class="timeline-time-range">${e.mulai} - ${e.selesai}</div>
+                        <div class="timeline-time-duration">${e.durasi} Jam</div>
+                        ${liveTag ? `<div style="margin-top:4px;">${liveTag}</div>` : ''}
+                    </div>
+                    <div class="timeline-card-col">
+                        <div class="timeline-card ${catClass} ${hasConflict ? 'has-conflict' : ''}" id="timeline-card-${e.id}">
+                            ${conflictRibbon}
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; flex-wrap: wrap; margin-bottom: 6px;">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="font-size: 1.1rem;">${e.icon}</span>
+                                    <h4 style="font-size: 0.98rem; font-weight: 800; color: var(--text-primary); margin: 0;">${e.aktivitas}</h4>
+                                </div>
+                                <div style="display: flex; gap: 6px; align-items: center;">
+                                    ${catBadge}
+                                    ${statusBadge}
+                                </div>
+                            </div>
+                            <div style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 4px;">
+                                ${e.output || '-'}
+                            </div>
+                            ${metodeBadge}
+                            ${e.catatan ? `<div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">📝 <em>${e.catatan}</em></div>` : ''}
+                            ${actionBtns}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    renderDailySummaryReport(unifiedEvents, totalAgenda, selesaiCount, pctSelesai, totalHours, conflictsCount, formattedDate) {
+        const reportContainer = document.getElementById('daily-summary-report-content');
+        if (!reportContainer) return;
+
+        const workouts = unifiedEvents.filter(e => e.kategori === 'Latihan');
+        const workTasks = unifiedEvents.filter(e => e.kategori === 'Kerja');
+        const totalWorkHours = workTasks.reduce((acc, cur) => acc + parseFloat(cur.durasi || 0), 0);
+        const workoutMetodes = workouts.map(w => w.metode_latihan || w.aktivitas).filter(Boolean).join(', ');
+
+        const conflictText = conflictsCount === 0
+            ? '✅ 0 Bentrokan Jam (Jadwal berjalan harmonis & teratur)'
+            : `⚠️ ${Math.ceil(conflictsCount / 2)} Bentrokan Jam Terdeteksi (Perlu penyesuaian jam)`;
+
+        const reportText = `================================================
+📊 EXECUTIVE DAILY BRIEF: JADWAL TERPADU
+📅 Tanggal: ${formattedDate}
+================================================
+
+1. ALOKASI WAKTU & PRODUKTIVITAS:
+• Total Agenda Terjadwal : ${totalAgenda} Kegiatan
+• Tingkat Penyelesaian   : ${selesaiCount} / ${totalAgenda} Selesai (${pctSelesai}%)
+• Akumulasi Durasi Kerja : ${totalWorkHours.toFixed(1)} Jam
+• Status Anti-Bentrokan  : ${conflictText}
+
+2. JADWAL LATIHAN & METODE FISIK:
+• Sesi Terjadwal         : ${workouts.length > 0 ? workouts.map(w => w.aktivitas).join(' | ') : 'Sesi Pemulihan / Restorasi'}
+• Metode yang Digunakan  : ${workoutMetodes || 'Tempo Terkontrol 2-1-1 & Isometrik Korset Perut'}
+
+3. RITME NUTRISI & AUTOFAGI:
+• Hidrasi Pagi           : 05:30 (500 ml Air + Garam Mineral)
+• Makan Siang Utama      : 12:30 - 13:00 (Tinggi Protein & Sayur)
+• Cut-Off Makan Malam    : 19:00 - 19:30 (Tanpa Karbohidrat / Nasi)
+• Jendela Tidur HGH      : 21:45 - 05:30 (Deep Sleep 70-80% HGH)
+
+4. AUDIT & REKOMENDASI SISTEM:
+${conflictsCount === 0 
+    ? '• Agenda harian sudah tersusun rapi secara kronologis tanpa tumpang tindih waktu.' 
+    : '• Terdapat agenda yang bertabrakan pada jam pelaksanaan. Disarankan melakukan penyesuaian waktu pada kartu bertanda merah.'}
+================================================`;
+
+        reportContainer.innerText = reportText;
+    }
+
+    renderSummaryChecklist() {
+        const container = document.getElementById('summary-quick-checklist');
+        if (!container) return;
+
+        const water = this.data.todayWater || 0;
+        const targetWater = this.data.targetWater || 3000;
+        const waterPct = Math.min(100, Math.round((water / targetWater) * 100));
+
+        const todayBio = (this.data.bioLogs || []).find(b => b.tanggal === this.selectedSummaryDate);
+
+        container.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <span>💧 <strong>Asupan Air:</strong> ${water.toLocaleString()} / ${targetWater.toLocaleString()} ml</span>
+                <span class="badge ${waterPct >= 80 ? 'badge-success' : 'badge-warning'}">${waterPct}%</span>
+            </div>
+            <div style="width:100%; height:6px; background:#e2e8f0; border-radius:3px; overflow:hidden; margin-bottom:12px;">
+                <div style="width:${waterPct}%; height:100%; background:var(--primary-green);"></div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <span>🥗 <strong>Cut-Off Makan Malam:</strong></span>
+                <span class="badge ${todayBio && todayBio.noCarb === 'Ya' ? 'badge-success' : 'badge-neutral'}">
+                    ${todayBio ? todayBio.makanMalam + ' (No Carb)' : '19.00 - 19.30'}
+                </span>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <span>🧘 <strong>Dekompresi Fasia:</strong></span>
+                <span class="badge ${todayBio && todayBio.hang && todayBio.hang.includes('Ya') ? 'badge-success' : 'badge-info'}">
+                    ${todayBio ? todayBio.hang : 'Dead Hang 3x30s'}
+                </span>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span>🌙 <strong>Jam Masuk Tidur:</strong></span>
+                <span class="badge badge-success">${todayBio ? todayBio.jamTidur : '21.45 (Target HGH)'}</span>
+            </div>
+        `;
+    }
+
+    setTimelineFilter(filterName) {
+        this.timelineFilter = filterName;
+        document.querySelectorAll('.timeline-filter-btn').forEach(btn => {
+            const f = btn.getAttribute('data-filter');
+            if (f === filterName) {
+                btn.className = 'btn btn-xs btn-primary timeline-filter-btn active';
+            } else {
+                btn.className = 'btn btn-xs btn-outline timeline-filter-btn';
+            }
+        });
+        this.renderSummaryDashboard();
+    }
+
+    navigateSummaryDay(delta) {
+        const current = new Date(this.selectedSummaryDate + 'T00:00:00');
+        if (isNaN(current.getTime())) {
+            this.selectedSummaryDate = new Date().toISOString().split('T')[0];
+        } else {
+            current.setDate(current.getDate() + delta);
+            const y = current.getFullYear();
+            const m = String(current.getMonth() + 1).padStart(2, '0');
+            const d = String(current.getDate()).padStart(2, '0');
+            this.selectedSummaryDate = `${y}-${m}-${d}`;
+        }
+        this.renderSummaryDashboard();
+    }
+
+    navigateSummaryToday() {
+        this.selectedSummaryDate = new Date().toISOString().split('T')[0];
+        this.renderSummaryDashboard();
+    }
+
+    openQuickAddTask() {
+        this.switchTab('jurnal-kerja');
+        const taskTgl = document.getElementById('task-tgl');
+        if (taskTgl) taskTgl.value = this.selectedSummaryDate;
+        const formCard = document.getElementById('card-form-task');
+        if (formCard) formCard.scrollIntoView({ behavior: 'smooth' });
+        document.getElementById('task-nama')?.focus();
+    }
+
+    openQuickAddWorkout() {
+        this.switchTab('jadwal-latihan');
+        const schedTgl = document.getElementById('sched-workout-tgl');
+        if (schedTgl) schedTgl.value = this.selectedSummaryDate;
+        const formCard = document.getElementById('card-form-workout-schedule');
+        if (formCard) formCard.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    scrollToFirstConflict() {
+        const firstConflict = document.querySelector('.timeline-card.has-conflict');
+        if (firstConflict) {
+            firstConflict.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            firstConflict.style.transition = 'transform 0.2s ease, box-shadow 0.2s ease';
+            firstConflict.style.transform = 'scale(1.02)';
+            setTimeout(() => {
+                firstConflict.style.transform = 'none';
+            }, 1000);
+        } else {
+            this.showToast('✅ Tidak ada bentrokan jam pada tanggal ini.');
+        }
+    }
+
+    quickAdjustConflictTime(taskId) {
+        const task = this.data.tasks.find(t => t.id === taskId);
+        if (task) {
+            this.switchTab('jurnal-kerja');
+            this.startEditTask(taskId);
+        } else {
+            this.switchTab('jadwal-latihan');
+            const formCard = document.getElementById('card-form-workout-schedule');
+            if (formCard) formCard.scrollIntoView({ behavior: 'smooth' });
+        }
+    }
+
+    async toggleTaskStatusFromTimeline(taskId) {
+        const task = this.data.tasks.find(t => t.id === taskId);
+        if (!task) return;
+        task.status = task.status === 'Selesai' ? 'Sedang Berjalan' : 'Selesai';
+        this.saveState();
+        this.renderTasks();
+        this.renderDashboard();
+        this.renderSummaryDashboard();
+        if (window.supabaseService) {
+            await window.supabaseService.upsertTask(task);
+        }
+        this.showToast(`Status "${task.aktivitas}" diubah ke ${task.status}`);
+    }
+
+    copyDailySummaryReport() {
+        const text = document.getElementById('daily-summary-report-content')?.innerText;
+        if (!text) return;
+        navigator.clipboard.writeText(text).then(() => {
+            this.showToast('📋 Rapor harian berhasil disalin ke clipboard!');
+        }).catch(() => {
+            this.showToast('Silakan salin teks rapor secara manual.');
+        });
+    }
+
+    printDailyReport() {
+        window.print();
+    }
+
     renderAll() {
+        this.renderSummaryDashboard();
         this.renderHydration();
         this.renderDailyChecklists();
         this.renderTasks();
@@ -1087,10 +1867,19 @@ class AppManager {
         const todayStr = new Date().toISOString().split('T')[0];
         const taskTgl = document.getElementById('task-tgl');
         const bioTgl = document.getElementById('bio-tgl');
+        const schedTgl = document.getElementById('sched-workout-tgl');
+        const summaryTgl = document.getElementById('summary-selected-date');
         if (taskTgl && !this.editingTaskId) taskTgl.value = todayStr;
         if (bioTgl && !this.editingBioLogId) bioTgl.value = todayStr;
+        if (schedTgl) schedTgl.value = todayStr;
+        if (summaryTgl) summaryTgl.value = this.selectedSummaryDate;
+        this.updateWorkoutDurationBadge();
     }
 }
+
+window.switchTab = (tabId) => {
+    if (window.app) window.app.switchTab(tabId);
+};
 
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new AppManager();

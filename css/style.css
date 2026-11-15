@@ -596,4 +596,205 @@ body {
     .form-grid {
         grid-template-columns: 1fr;
     }
+    #summary-main-grid {
+        grid-template-columns: 1fr !important;
+    }
+    .timeline-item {
+        flex-direction: column;
+        gap: 8px !important;
+    }
+    .timeline-time-col {
+        min-width: 100% !important;
+        text-align: left !important;
+    }
+}
+
+/* Modal Pop-up Anti-Bentrokan Jam */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(4px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    animation: fadeInModal 0.2s ease-out;
+}
+
+@keyframes fadeInModal {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.modal-content {
+    background: #ffffff;
+    border-radius: var(--radius-lg);
+    width: 100%;
+    animation: slideUpModal 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideUpModal {
+    from { transform: translateY(20px) scale(0.97); }
+    to { transform: translateY(0) scale(1); }
+}
+
+/* Master Unified Timeline */
+.unified-timeline {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.timeline-item {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    position: relative;
+}
+
+.timeline-time-col {
+    min-width: 120px;
+    text-align: right;
+    padding-top: 4px;
+    flex-shrink: 0;
+}
+
+.timeline-time-range {
+    font-weight: 800;
+    font-size: 0.92rem;
+    color: var(--primary-navy);
+    line-height: 1.2;
+}
+
+.timeline-time-duration {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.timeline-card-col {
+    flex: 1;
+}
+
+.timeline-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 14px 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.timeline-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.timeline-card.cat-kerja {
+    border-left: 4px solid #2563eb;
+}
+
+.timeline-card.cat-latihan {
+    border-left: 4px solid #7c3aed;
+    background: #faf5ff;
+}
+
+.timeline-card.cat-nutrisi {
+    border-left: 4px solid #ea580c;
+}
+
+.timeline-card.cat-biologis {
+    border-left: 4px solid #059669;
+    background: #f0fdf4;
+}
+
+/* Conflict Card Alert */
+.timeline-card.has-conflict {
+    border: 2px solid #ef4444 !important;
+    border-left: 6px solid #dc2626 !important;
+    background: #fef2f2 !important;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+}
+
+.conflict-alert-ribbon {
+    background: #fee2e2;
+    border: 1px solid #fca5a5;
+    color: #991b1b;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+/* Live indicator */
+.live-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #dcfce7;
+    color: #15803d;
+    border: 1px solid #86efac;
+    font-size: 0.72rem;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 12px;
+    text-transform: uppercase;
+}
+
+.live-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #22c55e;
+    animation: livePulse 1.5s infinite;
+}
+
+@keyframes livePulse {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+    70% { transform: scale(1.15); box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+
+/* Extra Utility Buttons */
+.btn-xs {
+    padding: 3px 8px;
+    font-size: 0.75rem;
+    border-radius: 4px;
+}
+
+/* Print Friendly Layout */
+@media print {
+    body {
+        background: #ffffff !important;
+        color: #000000 !important;
+        padding: 0 !important;
+    }
+    .app-header, .nav-tabs-wrapper, #cloud-sync-badge, .header-status-badge, button, .modal-overlay, #card-form-task, #card-form-bio, #card-form-workout-schedule {
+        display: none !important;
+    }
+    .tab-content {
+        display: none !important;
+    }
+    #tab-summary-jadwal {
+        display: block !important;
+    }
+    #summary-main-grid {
+        display: block !important;
+    }
+    .card {
+        box-shadow: none !important;
+        border: 1px solid #ccc !important;
+        break-inside: avoid;
+    }
 }
