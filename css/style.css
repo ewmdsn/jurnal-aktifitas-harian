@@ -773,6 +773,118 @@ body {
     border-radius: 4px;
 }
 
+/* Category Salat in Timeline */
+.timeline-card.cat-salat {
+    border-left: 5px solid #059669 !important;
+    background: #ecfdf5 !important;
+}
+
+/* Realtime Clock & Prayer Times Widget */
+.prayer-realtime-card {
+    background: linear-gradient(135deg, rgba(15, 43, 72, 0.96) 0%, rgba(31, 78, 121, 0.96) 100%);
+    border: 1px solid rgba(147, 197, 253, 0.25);
+    border-radius: var(--radius-lg);
+    padding: 16px 20px;
+    margin-bottom: 22px;
+    box-shadow: var(--shadow-md);
+    color: #ffffff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.prayer-clock-section {
+    display: flex;
+    flex-direction: column;
+}
+
+.clock-display {
+    font-size: 1.6rem;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    color: #67e8f9;
+    font-family: 'Consolas', 'Courier New', monospace;
+    line-height: 1.1;
+}
+
+.date-display {
+    font-size: 0.84rem;
+    color: #cbd5e1;
+    font-weight: 600;
+    margin-top: 4px;
+}
+
+.prayer-times-section {
+    flex: 1;
+    min-width: 320px;
+}
+
+.prayer-times-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.prayer-next-badge {
+    background: rgba(34, 197, 94, 0.2);
+    border: 1px solid rgba(74, 222, 128, 0.4);
+    color: #86efac;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.prayer-times-bar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.prayer-time-pill {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    padding: 6px 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 65px;
+    transition: all 0.2s ease;
+}
+
+.prayer-time-pill.active-next {
+    background: rgba(14, 165, 233, 0.35);
+    border-color: #38bdf8;
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.35);
+    transform: translateY(-2px);
+}
+
+.prayer-time-pill .p-name {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+    font-weight: 700;
+}
+
+.prayer-time-pill.active-next .p-name {
+    color: #bae6fd;
+}
+
+.prayer-time-pill .p-time {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #ffffff;
+}
+
 /* Print Friendly Layout */
 @media print {
     body {

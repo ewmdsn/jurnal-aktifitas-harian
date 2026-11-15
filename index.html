@@ -56,6 +56,44 @@
         <!-- TAB UTAMA: RINGKASAN JADWAL TERPADU & SUMMARY (DEPAN)    -->
         <!-- ======================================================== -->
         <section id="tab-summary-jadwal" class="tab-content active">
+            <!-- REALTIME CLOCK & PRAYER TIMES BAR WIDGET -->
+            <div class="prayer-realtime-card">
+                <div class="prayer-clock-section">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 1.1rem;">⏱️</span>
+                        <div class="clock-display" id="realtime-clock-display">--:--:-- WIB</div>
+                    </div>
+                    <div class="date-display" id="realtime-date-display">--</div>
+                </div>
+
+                <div class="prayer-times-section">
+                    <div class="prayer-times-header">
+                        <div class="prayer-next-badge" id="prayer-next-badge">
+                            <span>🕌 Menghitung waktu salat berikutnya...</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span style="font-size: 0.75rem; color: #94a3b8;">Lokasi:</span>
+                            <select id="prayer-city-select" onchange="window.prayerManager.setCity(this.value)" style="background: rgba(15,23,42,0.6); color: #e2e8f0; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; padding: 3px 8px; font-size: 0.75rem; font-weight: 600;">
+                                <option value="jakarta">DKI Jakarta & Sekitarnya (WIB)</option>
+                                <option value="surabaya">Surabaya & Jatim (WIB)</option>
+                                <option value="bandung">Bandung & Jabar (WIB)</option>
+                                <option value="semarang">Semarang & Jateng (WIB)</option>
+                                <option value="yogyakarta">DI Yogyakarta (WIB)</option>
+                                <option value="medan">Medan & Sumut (WIB)</option>
+                                <option value="palembang">Palembang & Sumsel (WIB)</option>
+                                <option value="makassar">Makassar & Sulsel (WITA)</option>
+                                <option value="denpasar">Denpasar Bali (WITA)</option>
+                                <option value="banjarmasin">Banjarmasin (WITA)</option>
+                                <option value="jayapura">Jayapura Papua (WIT)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="prayer-times-bar" id="prayer-times-bar">
+                        <!-- Diisi otomatis secara realtime oleh prayer-times.js -->
+                    </div>
+                </div>
+            </div>
+
             <!-- Filter Tanggal & Status Hari -->
             <div class="card" style="margin-bottom: 20px; border-left: 5px solid var(--primary-navy);">
                 <div class="header-control-row" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
@@ -64,11 +102,14 @@
                             <h2 style="font-size: 1.3rem; font-weight: 800; color: var(--primary-navy); margin: 0;">📅 Dashboard Jadwal Terpadu Harian</h2>
                             <span class="badge badge-success" id="summary-badge-fase">Fase 2 & 3: Remodeling Otot-Tulang</span>
                         </div>
-                        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">
+                        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px; margin-bottom: 0;">
                             Menggabungkan seluruh agenda kerja, jadwal latihan fisik & metode, serta jendela nutrisi & ritme biologis dalam satu garis waktu kronologis otomatis.
                         </p>
                     </div>
                     <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                        <button class="btn btn-sm btn-green" id="btn-open-auto-schedule" onclick="window.app.openAutoScheduleModal()" style="font-weight: 800; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.3);">
+                            <span>⚡ Susun Jadwal Optimal (Protokol Emas)</span>
+                        </button>
                         <button class="btn btn-sm btn-outline" id="btn-summary-prev-day" onclick="window.app.navigateSummaryDay(-1)">◀ Hari Sebelumnya</button>
                         <input type="date" id="summary-selected-date" class="form-control" style="width: auto; padding: 6px 12px; font-weight: 700;">
                         <button class="btn btn-sm btn-primary" id="btn-summary-today" onclick="window.app.navigateSummaryToday()">Hari Ini</button>
@@ -130,6 +171,7 @@
                     <!-- Filter Kategori Timeline -->
                     <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px dashed var(--border-color);" id="summary-timeline-filters">
                         <button class="btn btn-xs btn-primary timeline-filter-btn active" data-filter="all" onclick="window.app.setTimelineFilter('all')">Semua Agenda</button>
+                        <button class="btn btn-xs btn-outline timeline-filter-btn" data-filter="Salat" onclick="window.app.setTimelineFilter('Salat')">🕌 Salat 5 Waktu</button>
                         <button class="btn btn-xs btn-outline timeline-filter-btn" data-filter="Kerja" onclick="window.app.setTimelineFilter('Kerja')">💼 Kerja Saja</button>
                         <button class="btn btn-xs btn-outline timeline-filter-btn" data-filter="Latihan" onclick="window.app.setTimelineFilter('Latihan')">🏋️ Latihan Saja</button>
                         <button class="btn btn-xs btn-outline timeline-filter-btn" data-filter="Nutrisi" onclick="window.app.setTimelineFilter('Nutrisi')">🍽️ Nutrisi Saja</button>
@@ -924,6 +966,119 @@
         </div>
     </div>
 
+    <!-- ======================================================== -->
+    <!-- MODAL PENYUSUNAN JADWAL OPTIMAL OTOMATIS (PROTOKOL EMAS) -->
+    <!-- ======================================================== -->
+    <div id="modal-auto-schedule" class="modal-overlay" style="display: none;">
+        <div class="modal-content card" style="max-width: 680px; border-left: 6px solid var(--primary-green); margin: 40px auto; padding: 24px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.35);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 16px; border-bottom: 2px solid var(--border-color); padding-bottom: 12px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 48px; height: 48px; border-radius: 12px; background: #dcfce7; color: #15803d; display: flex; align-items: center; justify-content: center; font-size: 26px; flex-shrink: 0;">
+                        ⚡
+                    </div>
+                    <div>
+                        <h3 style="color: var(--primary-navy); font-size: 1.25rem; font-weight: 800; margin: 0;">Penyusunan Jadwal Optimal Otomatis (Protokol Emas)</h3>
+                        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px; margin-bottom: 0;">
+                            Menyusun garis waktu 24 jam bebas bentrokan yang memadukan Salat 5 Waktu, Nutrisi Seluler, Sesi Latihan V-Taper, Blok Kerja Produktif, dan Dekompresi Fasia.
+                        </p>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline" onclick="window.app.closeAutoScheduleModal()" style="border: none; font-size: 1.2rem; cursor: pointer;">✕</button>
+            </div>
+
+            <form id="form-auto-schedule" onsubmit="window.app.applyAutoOptimalSchedule(event)">
+                <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+                    <div class="form-group">
+                        <label class="form-label" style="font-weight: 700;">📅 Target Tanggal Jadwal</label>
+                        <input type="date" id="auto-sched-target-date" class="form-control" required style="font-weight: 700;">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" style="font-weight: 700;">🏙️ Lokasi Waktu Salat</label>
+                        <select id="auto-sched-city" class="form-control" onchange="window.prayerManager.setCity(this.value)">
+                            <option value="jakarta">DKI Jakarta & Sekitarnya (WIB)</option>
+                            <option value="surabaya">Surabaya & Jatim (WIB)</option>
+                            <option value="bandung">Bandung & Jabar (WIB)</option>
+                            <option value="semarang">Semarang & Jateng (WIB)</option>
+                            <option value="yogyakarta">DI Yogyakarta (WIB)</option>
+                            <option value="medan">Medan & Sumut (WIB)</option>
+                            <option value="palembang">Palembang & Sumsel (WIB)</option>
+                            <option value="makassar">Makassar & Sulsel (WITA)</option>
+                            <option value="denpasar">Denpasar Bali (WITA)</option>
+                            <option value="banjarmasin">Banjarmasin (WITA)</option>
+                            <option value="jayapura">Jayapura Papua (WIT)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+                    <div class="form-group">
+                        <label class="form-label" style="font-weight: 700;">🏋️ Sesi Latihan V-Taper Hari Ini</label>
+                        <select id="auto-sched-workout-session" class="form-control" style="font-weight: 600;">
+                            <option value="sesi-a">Sesi A: Bahu Lateral & Upper Back (Lebar V-Taper)</option>
+                            <option value="sesi-b">Sesi B: Dada Atas & Lengan Triceps (Ketebalan Torso)</option>
+                            <option value="sesi-c">Sesi C: Kaki & Postur Posterior Chain (Fondasi & HGH)</option>
+                            <option value="sesi-d">Sesi D: Core Kompresi & Mobilitas Torakal (Postur)</option>
+                            <option value="rest">Hari Pemulihan Penuh / Restorasi Aktif</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" style="font-weight: 700;">⚡ Metode Latihan Fisik Terpilih</label>
+                        <select id="auto-sched-workout-metode" class="form-control" style="font-weight: 600;">
+                            <option value="30-10-30 Hypertrophy & Sarcoplasmic Pump (Dingle/Jones Protocol)">30-10-30 Hypertrophy & Sarcoplasmic Pump</option>
+                            <option value="Zone 2 Cardio & Aerobic Mitochondrial Base (60-70% MHR)">Zone 2 Cardio & Aerobic Mitochondrial Base</option>
+                            <option value="Rest-Pause Myo-Reps High Density (Borge Fagerli System)">Rest-Pause Myo-Reps High Density</option>
+                            <option value="Tempo Kontrol Eksentrik 4-1-1 (Time Under Tension Maximizer)">Tempo Kontrol Eksentrik 4-1-1</option>
+                            <option value="Drop Set Mekanikal & Fascial Stretch Under Load">Drop Set Mekanikal & Fascial Stretch Under Load</option>
+                            <option value="Isometrik Akhir Rentang Gerak (End-Range Isometric Hold)">Isometrik Akhir Rentang Gerak</option>
+                            <option value="Interval HIIT Tabata 20s/10s (Metabolic Conditioning)">Interval HIIT Tabata 20s/10s</option>
+                            <option value="Sirkuit Fungsional Atletik & Postur (Compound Movements)">Sirkuit Fungsional Atletik & Postur</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Preview Blueprint Jadwal Otomatis 24 Jam -->
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; margin-bottom: 18px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 0.82rem; font-weight: 800; color: var(--primary-navy); text-transform: uppercase;">✨ Rangkaian Alur Protokol Emas (100% Bebas Bentrokan):</span>
+                        <span class="badge badge-success">Harmoni 24 Jam</span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.78rem; line-height: 1.4; color: var(--text-primary);">
+                        <div>• <strong>04:05 - 04:35:</strong> 🕌 Salat Subuh & Dzikir Pagi</div>
+                        <div>• <strong>04:45 - 05:15:</strong> 🌅 Hidrasi Himalaya & Mobilitas</div>
+                        <div>• <strong>05:30 - 06:15:</strong> 🍳 Sarapan Pembangun & Asam Amino</div>
+                        <div>• <strong>07:00 - 11:30:</strong> 💼 Deep Work Pagi (Fokus Tinggi)</div>
+                        <div>• <strong>11:45 - 12:20:</strong> 🕌 Salat Dzuhur & Jeda Mental</div>
+                        <div>• <strong>12:20 - 13:00:</strong> 🍗 Makan Siang Utama (Tinggi Protein)</div>
+                        <div>• <strong>13:30 - 15:00:</strong> 💼 Kerja Siang & Eksekusi Lapangan</div>
+                        <div>• <strong>15:15 - 15:45:</strong> 🕌 Salat Ashar & Reset Energi</div>
+                        <div>• <strong>16:30 - 17:15:</strong> 🏋️ Latihan Fisik V-Taper (45 Mnt)</div>
+                        <div>• <strong>17:20 - 17:45:</strong> 🍌 Nutrisi Pemulihan Cepat Otot</div>
+                        <div>• <strong>17:55 - 18:25:</strong> 🕌 Salat Maghrib & Refleksi Senja</div>
+                        <div>• <strong>18:30 - 19:00:</strong> 🥗 Cut-Off Makan Malam No-Carb</div>
+                        <div>• <strong>19:15 - 19:45:</strong> 🕌 Salat Isya Berjamaah</div>
+                        <div>• <strong>20:00 - 20:50:</strong> 📖 Evaluasi Aktivitas & Rencana Esok</div>
+                        <div>• <strong>21:00 - 21:30:</strong> 🧘 Dekompresi Fasia (Dead Hang)</div>
+                        <div>• <strong>21:45 - 04:05:</strong> 🌙 Deep Sleep HGH (Kegelapan Total)</div>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; color: var(--text-primary);">
+                        <input type="checkbox" id="auto-sched-replace-existing" checked style="width: 16px; height: 16px;">
+                        <span>Gantikan agenda kerja & latihan yang sudah ada pada tanggal ini agar jadwal sepenuhnya bersih & rapi bebas bentrokan</span>
+                    </label>
+                </div>
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap;">
+                    <button type="button" class="btn btn-outline" onclick="window.app.closeAutoScheduleModal()">Batal</button>
+                    <button type="submit" class="btn btn-green" style="font-weight: 800; padding: 10px 22px;">
+                        🚀 Terapkan Jadwal Optimal Sekarang
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Toast Notification -->
     <div id="app-toast" style="position: fixed; bottom: 24px; right: 24px; background: #0f172a; color: #ffffff; padding: 12px 20px; border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3); font-size: 0.88rem; font-weight: 600; display: none; z-index: 10000; animation: fadeInModal 0.2s ease;"></div>
 
@@ -932,6 +1087,7 @@
     <script src="js/timer.js"></script>
     <script src="js/export.js"></script>
     <script src="js/supabase-client.js"></script>
+    <script src="js/prayer-times.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

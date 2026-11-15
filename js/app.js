@@ -194,6 +194,21 @@ class AppManager {
             });
         }
 
+        // Inisialisasi Kota Waktu Salat & Overlay Modal
+        const citySelect = document.getElementById('prayer-city-select');
+        const autoCitySelect = document.getElementById('auto-sched-city');
+        if (window.prayerManager) {
+            if (citySelect) citySelect.value = window.prayerManager.selectedCityKey;
+            if (autoCitySelect) autoCitySelect.value = window.prayerManager.selectedCityKey;
+        }
+
+        const modalAutoSched = document.getElementById('modal-auto-schedule');
+        if (modalAutoSched) {
+            modalAutoSched.addEventListener('click', (e) => {
+                if (e.target === modalAutoSched) this.closeAutoScheduleModal();
+            });
+        }
+
         // Form Submit: Tambah / Edit Log Biologis
         const formBio = document.getElementById('form-add-bio');
         if (formBio) {
@@ -1410,6 +1425,7 @@ class AppManager {
             if (t.kategori === 'Latihan & Olah Tubuh') catType = 'Latihan';
             else if (t.kategori.includes('Nutrisi') || t.kategori.includes('Makan')) catType = 'Nutrisi';
             else if (t.kategori.includes('Biologis') || t.kategori.includes('Kesehatan')) catType = 'Biologis';
+            else if (t.kategori.includes('Salat') || t.kategori.includes('Ibadah')) catType = 'Salat';
 
             unifiedEvents.push({
                 id: t.id,
@@ -1426,7 +1442,7 @@ class AppManager {
                 fokus: t.fokus || 5,
                 catatan: t.catatan || '',
                 isUserTask: true,
-                icon: catType === 'Kerja' ? '💼' : (catType === 'Latihan' ? '🏋️' : (catType === 'Nutrisi' ? '🍽️' : '🧬'))
+                icon: catType === 'Kerja' ? '💼' : (catType === 'Latihan' ? '🏋️' : (catType === 'Nutrisi' ? '🍽️' : (catType === 'Salat' ? '🕌' : '🧬')))
             });
         });
 
@@ -1456,6 +1472,45 @@ class AppManager {
                 });
             }
         });
+
+        // Integrasikan Waktu Salat 5 Waktu Realtime Astronomis
+        let prayerTimes = null;
+        if (window.prayerManager) {
+            prayerTimes = window.prayerManager.calculate(this.selectedSummaryDate);
+            const prayerEvents = [
+                { id: 'salat-subuh', mulai: prayerTimes.subuh, selesai: prayerTimes.subuhSelesai, durasi: '0.50', kategori: 'Salat', aktivitas: 'Salat Subuh & Dzikir Fajar', output: 'Membangun ketenangan spiritual, kejernihan batin, dan niat fajar', icon: '🌅' },
+                { id: 'salat-dzuhur', mulai: prayerTimes.dzuhur, selesai: prayerTimes.dzuhurSelesai, durasi: '0.50', kategori: 'Salat', aktivitas: 'Salat Dzuhur & Jeda Istirahat Mental', output: 'Reset beban kognitif tengah hari & pembaruan fokus', icon: '☀️' },
+                { id: 'salat-ashar', mulai: prayerTimes.ashar, selesai: prayerTimes.asharSelesai, durasi: '0.50', kategori: 'Salat', aktivitas: 'Salat Ashar & Transisi Energi Sore', output: 'Persiapan transisi mental sebelum agenda sore / latihan', icon: '🌤️' },
+                { id: 'salat-maghrib', mulai: prayerTimes.maghrib, selesai: prayerTimes.maghribSelesai, durasi: '0.50', kategori: 'Salat', aktivitas: 'Salat Maghrib & Refleksi Senja', output: 'Peralihan ritme sirkadian siang ke malam & rasa syukur', icon: '🌇' },
+                { id: 'salat-isya', mulai: prayerTimes.isya, selesai: prayerTimes.isyaSelesai, durasi: '0.50', kategori: 'Salat', aktivitas: 'Salat Isya Berjamaah & Doa Malam', output: 'Menenangkan gelombang otak menjelang relaksasi & tidur', icon: '🌙' }
+            ];
+
+            prayerEvents.forEach(p => {
+                const hasDuplicate = unifiedEvents.some(u => 
+                    (u.kategori === 'Salat' || (u.aktivitas && u.aktivitas.toLowerCase().includes(p.id.replace('salat-', '')))) && 
+                    Math.abs(this.timeToMinutes(u.mulai) - this.timeToMinutes(p.mulai)) < 30
+                );
+                if (!hasDuplicate) {
+                    unifiedEvents.push({
+                        id: p.id,
+                        mulai: p.mulai,
+                        selesai: p.selesai,
+                        durasi: p.durasi,
+                        kategori: 'Salat',
+                        kategoriLabel: 'Salat 5 Waktu & Spiritualitas',
+                        aktivitas: p.aktivitas,
+                        output: p.output,
+                        metode_latihan: '',
+                        prioritas: 'Tinggi',
+                        status: 'Terjadwal',
+                        fokus: 5,
+                        catatan: `Jadwal Astronomis Realtime (${prayerTimes.cityName})`,
+                        isUserTask: false,
+                        icon: p.icon
+                    });
+                }
+            });
+        }
 
         // Urutkan secara kronologis (00:00 -> 23:59)
         unifiedEvents.sort((a, b) => this.timeToMinutes(a.mulai) - this.timeToMinutes(b.mulai));
@@ -1540,7 +1595,7 @@ class AppManager {
         this.renderSummaryTimeline(unifiedEvents);
 
         // 5. RENDER DAILY EXECUTIVE SUMMARY REPORT
-        this.renderDailySummaryReport(unifiedEvents, totalAgenda, selesaiCount, pctSelesai, totalHours, totalConflictsCount, formattedDate);
+        this.renderDailySummaryReport(unifiedEvents, totalAgenda, selesaiCount, pctSelesai, totalHours, totalConflictsCount, formattedDate, prayerTimes);
 
         // 6. RENDER QUICK CHECKLIST
         this.renderSummaryChecklist();
@@ -1590,6 +1645,9 @@ class AppManager {
             } else if (e.kategori === 'Biologis') {
                 catClass = 'cat-biologis';
                 catBadge = '<span class="badge badge-success">🧬 Biologis</span>';
+            } else if (e.kategori === 'Salat') {
+                catClass = 'cat-salat';
+                catBadge = '<span class="badge" style="background:#d1fae5; color:#065f46; border:1px solid #6ee7b7;">🕌 Salat 5 Waktu</span>';
             }
 
             let statusBadge = e.status === 'Selesai'
@@ -1666,7 +1724,7 @@ class AppManager {
         }).join('');
     }
 
-    renderDailySummaryReport(unifiedEvents, totalAgenda, selesaiCount, pctSelesai, totalHours, conflictsCount, formattedDate) {
+    renderDailySummaryReport(unifiedEvents, totalAgenda, selesaiCount, pctSelesai, totalHours, conflictsCount, formattedDate, prayerTimes) {
         const reportContainer = document.getElementById('daily-summary-report-content');
         if (!reportContainer) return;
 
@@ -1678,6 +1736,17 @@ class AppManager {
         const conflictText = conflictsCount === 0
             ? '✅ 0 Bentrokan Jam (Jadwal berjalan harmonis & teratur)'
             : `⚠️ ${Math.ceil(conflictsCount / 2)} Bentrokan Jam Terdeteksi (Perlu penyesuaian jam)`;
+
+        const salatSection = prayerTimes
+            ? `3. RITME SPIRITUAL (SALAT 5 WAKTU REALTIME):
+• Lokasi Astronomis    : ${prayerTimes.cityName}
+• Subuh   : ${prayerTimes.subuh} (Doa & Dzikir Pagi)
+• Dzuhur  : ${prayerTimes.dzuhur} (Jeda Mental Tengah Hari)
+• Ashar   : ${prayerTimes.ashar} (Transisi Energi Sore)
+• Maghrib : ${prayerTimes.maghrib} (Refleksi Senja)
+• Isya    : ${prayerTimes.isya} (Penutupan Ibadah Harian)`
+            : `3. RITME SPIRITUAL (SALAT 5 WAKTU):
+• Salat 5 waktu tersinkronisasi otomatis dengan waktu lokal.`;
 
         const reportText = `================================================
 📊 EXECUTIVE DAILY BRIEF: JADWAL TERPADU
@@ -1694,13 +1763,18 @@ class AppManager {
 • Sesi Terjadwal         : ${workouts.length > 0 ? workouts.map(w => w.aktivitas).join(' | ') : 'Sesi Pemulihan / Restorasi'}
 • Metode yang Digunakan  : ${workoutMetodes || 'Tempo Terkontrol 2-1-1 & Isometrik Korset Perut'}
 
-3. RITME NUTRISI & AUTOFAGI:
-• Hidrasi Pagi           : 05:30 (500 ml Air + Garam Mineral)
-• Makan Siang Utama      : 12:30 - 13:00 (Tinggi Protein & Sayur)
-• Cut-Off Makan Malam    : 19:00 - 19:30 (Tanpa Karbohidrat / Nasi)
-• Jendela Tidur HGH      : 21:45 - 05:30 (Deep Sleep 70-80% HGH)
+${salatSection}
 
-4. AUDIT & REKOMENDASI SISTEM:
+4. RITME NUTRISI & AUTOFAGI:
+• Hidrasi Pagi           : 04:45 - 05:15 (500 ml Air + Garam Himalaya)
+• Sarapan Pembangun      : 05:30 - 06:15 (3 Telur Rebus & Karbo Kompleks)
+• Makan Siang Utama      : 12:20 - 13:00 (Tinggi Protein & Sayur Bening)
+• Nutrisi Pemulihan      : 17:20 - 17:45 (BCAA / Protein Cepat Serap)
+• Cut-Off Makan Malam    : 18:30 - 19:00 (Strictly Tanpa Karbohidrat / Nasi)
+• Dekompresi Fasia       : 21:00 - 21:30 (Dead Hang & Child's Pose)
+• Jendela Tidur HGH      : 21:45 - Subuh (Deep Sleep 70-80% HGH)
+
+5. AUDIT & REKOMENDASI SISTEM:
 ${conflictsCount === 0 
     ? '• Agenda harian sudah tersusun rapi secara kronologis tanpa tumpang tindih waktu.' 
     : '• Terdapat agenda yang bertabrakan pada jam pelaksanaan. Disarankan melakukan penyesuaian waktu pada kartu bertanda merah.'}
@@ -1847,6 +1921,347 @@ ${conflictsCount === 0
 
     printDailyReport() {
         window.print();
+    }
+
+    openAutoScheduleModal() {
+        const modal = document.getElementById('modal-auto-schedule');
+        if (!modal) return;
+        const targetDateInput = document.getElementById('auto-sched-target-date');
+        if (targetDateInput) targetDateInput.value = this.selectedSummaryDate || new Date().toISOString().split('T')[0];
+        const citySelect = document.getElementById('auto-sched-city');
+        if (citySelect && window.prayerManager) citySelect.value = window.prayerManager.selectedCityKey;
+        modal.style.display = 'block';
+    }
+
+    closeAutoScheduleModal() {
+        const modal = document.getElementById('modal-auto-schedule');
+        if (modal) modal.style.display = 'none';
+    }
+
+    applyAutoOptimalSchedule(e) {
+        if (e && e.preventDefault) e.preventDefault();
+        const tgl = document.getElementById('auto-sched-target-date')?.value || this.selectedSummaryDate;
+        const sesi = document.getElementById('auto-sched-workout-session')?.value || 'sesi-a';
+        const metode = document.getElementById('auto-sched-workout-metode')?.value || '30-10-30 Hypertrophy & Sarcoplasmic Pump (Dingle/Jones Protocol)';
+        const replaceExisting = document.getElementById('auto-sched-replace-existing')?.checked ?? true;
+
+        let pt = {
+            subuh: '04:15', subuhSelesai: '04:45',
+            dzuhur: '11:45', dzuhurSelesai: '12:15',
+            ashar: '15:15', asharSelesai: '15:45',
+            maghrib: '17:55', maghribSelesai: '18:25',
+            isya: '19:15', isyaSelesai: '19:45',
+            cityName: 'DKI Jakarta & Sekitarnya (WIB)'
+        };
+        if (window.prayerManager) {
+            pt = window.prayerManager.calculate(tgl);
+        }
+
+        let workoutTitle = 'Latihan Fisik V-Taper: Sesi A (Bahu Lateral & Upper Back)';
+        let workoutOutput = 'Lateral raise tempo 30-10-30, Face pull & Lat pulldown untuk memperlebar biacromial torso';
+        if (sesi === 'sesi-b') {
+            workoutTitle = 'Latihan Fisik V-Taper: Sesi B (Dada Atas & Triceps)';
+            workoutOutput = 'Incline dumbbell press & Triceps overhead extension mempertebal lingkar dada dan lengan';
+        } else if (sesi === 'sesi-c') {
+            workoutTitle = 'Latihan Fisik V-Taper: Sesi C (Kaki & Posterior Chain)';
+            workoutOutput = 'Romanian deadlift & Bulgarian split squat memicu lonjakan testosteron & hormon HGH alami';
+        } else if (sesi === 'sesi-d') {
+            workoutTitle = 'Latihan Fisik V-Taper: Sesi D (Core Kompresi & Torakal)';
+            workoutOutput = 'Ab wheel rollout, Pallof press & Thoracic rotation memperbaiki postur tegap';
+        } else if (sesi === 'rest') {
+            workoutTitle = 'Restorasi Aktif & Jalan Kaki Santai (Zone 1 Cardio)';
+            workoutOutput = 'Jalan santai 45 menit di udara terbuka untuk regenerasi glikogen dan pelepasan laktat';
+        }
+
+        const optimalTasks = [
+            {
+                id: 'opt-' + Date.now() + '-1',
+                tanggal: tgl,
+                mulai: pt.subuh,
+                selesai: pt.subuhSelesai,
+                durasi: '0.50',
+                kategori: 'Ibadah / Salat',
+                aktivitas: 'Salat Subuh Berjamaah & Dzikir Fajar',
+                output: 'Membangun ketenangan spiritual, kejernihan batin, dan niat produktif hari ini',
+                metode_latihan: 'Non-Latihan',
+                prioritas: 'Tinggi',
+                status: 'Terjadwal',
+                fokus: 5,
+                catatan: `Jadwal Astronomis Realtime (${pt.cityName})`
+            },
+            {
+                id: 'opt-' + Date.now() + '-2',
+                tanggal: tgl,
+                mulai: '04:45',
+                selesai: '05:15',
+                durasi: '0.50',
+                kategori: 'Kesehatan Biologis & Nutrisi',
+                aktivitas: 'Hidrasi Seluler Garam Himalaya & Stomach Vacuum Pagi',
+                output: '500ml air hangat + sejumput garam ionik, aktivasi transversus abdominis 4x20s',
+                metode_latihan: 'Non-Latihan',
+                prioritas: 'Tinggi',
+                status: 'Terjadwal',
+                fokus: 5,
+                catatan: 'Fondasi hidrasi sel & korset perut alami sebelum sarapan'
+            },
+            {
+                id: 'opt-' + Date.now() + '-3',
+                tanggal: tgl,
+                mulai: '05:30',
+                selesai: '06:15',
+                durasi: '0.75',
+                kategori: 'Kesehatan Biologis & Nutrisi',
+                aktivitas: 'Sarapan Pembangun: 3 Telur Rebus + Karbo Kompleks & Tumis Sayur',
+                output: 'Asupan asam amino esensial & energi stabil tanpa memicu kantuk (rendah indeks glikemik)',
+                metode_latihan: 'Non-Latihan',
+                prioritas: 'Tinggi',
+                status: 'Terjadwal',
+                fokus: 5,
+                catatan: 'Nutrisi anabolik dasar pemulihan'
+            },
+            {
+                id: 'opt-' + Date.now() + '-4',
+                tanggal: tgl,
+                mulai: '07:00',
+                selesai: '11:30',
+                durasi: '4.50',
+                kategori: 'Tugas Utama',
+                aktivitas: 'Deep Work Pagi: Analisis Strategis & Eksekusi Prioritas Utama',
+                output: 'Tuntas menyelesaikan pekerjaan bernilai tinggi dengan fokus 100% tanpa distraksi',
+                metode_latihan: 'Non-Latihan',
+                prioritas: 'Tinggi',
+                status: 'Terjadwal',
+                fokus: 5,
+                catatan: 'Golden Hour produktivitas otak'
+            },
+            {
+                id: 'opt-' + Date.now() + '-5',
+                tanggal: tgl,
+                mulai: pt.dzuhur,
+                selesai: pt.dzuhurSelesai,
+                durasi: '0.50',
+                kategori: 'Ibadah / Salat',
+                aktivitas: 'Salat Dzuhur & Jeda Istirahat Mental',
+                output: 'Mereset kelelahan kognitif tengah hari & pembaruan fokus',
+                metode_latihan: 'Non-Latihan',
+                prioritas: 'Tinggi',
+                status: 'Terjadwal',
+                fokus: 5,
+                catatan: `Jadwal Astronomis Realtime (${pt.cityName})`
+            },
+            {
+                id: 'opt-' + Date.now() + '-6',
+                tanggal: tgl,
+                mulai: '12:20',
+                selesai: '13:00',
+                durasi: '0.67',
+                kategori: 'Kesehatan Biologis & Nutrisi',
+                aktivitas: 'Makan Siang Utama: Dada Ayam/Ikan (150-200g) + Nasi 1 Kepal + Sayur Bening',
+                output: 'Pemicu fase anabolik (mTOR) & regenerasi serabut otot tanpa rasa begah',
+                metode_latihan: 'Non-Latihan',
+                prioritas: 'Tinggi',
+                status: 'Terjadwal',
+                fokus: 5,
+                catatan: 'Karbohidrat kompleks + protein lengkap'
+            },
+            {
+                id: 'opt-' + Date.now() + '-7',
+                tanggal: tgl,
+                mulai: '13:30',
+                selesai: '15:00',
+                durasi: '1.50',
+                kategori: 'Operasional',
+                aktivitas: 'Sesi Kerja Siang: Koordinasi Tim, Tindak Lanjut Teknis & Rapat',
+                output: 'Komunikasi dan penyelesaian tugas administratif lapangan tuntas rapi',
+                metode_latihan: 'Non-Latihan',
+                prioritas: 'Sedang',
+                status: 'Terjadwal',
+                fokus: 4,
+                catatan: 'Eksekusi operasional siang'
+            },
+            {
+                id: 'opt-' + Date.now() + '-8',
+                tanggal: tgl,
+                mulai: pt.ashar,
+                selesai: pt.asharSelesai,
+                durasi: '0.50',
+                kategori: 'Ibadah / Salat',
+                aktivitas: 'Salat Ashar & Persiapan Transisi Sore',
+                output: 'Transisi ketenangan sebelum memasuki sesi latihan fisik',
+                metode_latihan: 'Non-Latihan',
+                prioritas: 'Tinggi',
+                status: 'Terjadwal',
+                fokus: 5,
+                catatan: `Jadwal Astronomis Realtime (${pt.cityName})`
+            },
+            {
+                id: 'opt-' + Date.now() + '-9',
+                tanggal: tgl,
+                mulai: '16:30',
+                selesai: '17:15',
+                durasi: '0.75',
+                kategori: 'Latihan & Olah Tubuh',
+                aktivitas: workoutTitle,
+                output: workoutOutput,
+                metode_latihan: metode,
+                prioritas: 'Tinggi',
+                status: 'Terjadwal',
+                fokus: 5,
+                catatan: 'Durasi ketat 45 menit untuk optimasi rasio Testosteron:Kortisol'
+            },
+            {
+                id: 'opt-' + Date.now() + '-10',
+                tanggal: tgl,
+                mulai: '17:20',
+                selesai: '17:45',
+                durasi: '0.42',
+                kategori: 'Kesehatan Biologis & Nutrisi',
+                aktivitas: 'Nutrisi Pemulihan Cepat: 2 Putih Telur + Pisang Ambon / Whey Isolate',
+                output: 'Pengisian kembali glikogen otot & asam amino BCAA saat sensitivitas insulin tinggi',
+                metode_latihan: 'Non-Latihan',
+                prioritas: 'Tinggi',
+                status: 'Terjadwal',
+                fokus: 5,
+                catatan: 'Jendela anabolik pasca-latihan segera'
+            },
+            {
+                id: 'opt-' + Date.now() + '-11',
+                tanggal: tgl,
+                mulai: pt.maghrib,
+                selesai: pt.maghribSelesai,
+                durasi: '0.50',
+                kategori: 'Ibadah / Salat',
+                aktivitas: 'Salat Maghrib & Refleksi Senja',
+                output: 'Penenangan sistem saraf otonom saat pergantian cahaya senja',
+                metode_latihan: 'Non-Latihan',
+                prioritas: 'Tinggi',
+                status: 'Terjadwal',
+                fokus: 5,
+                catatan: `Jadwal Astronomis Realtime (${pt.cityName})`
+            },
+            {
+                id: 'opt-' + Date.now() + '-12',
+                tanggal: tgl,
+                mulai: '18:30',
+                selesai: '19:00',
+                durasi: '0.50',
+                kategori: 'Kesehatan Biologis & Nutrisi',
+                aktivitas: 'Cut-Off Makan Malam No-Carb: Ikan Bakar / Tahu Tempe & Sayur Hijau Zaitun',
+                output: 'Cut-off makan malam dimulai. Tanpa karbohidrat agar insulin turun nol dan memicu autofagi',
+                metode_latihan: 'Non-Latihan',
+                prioritas: 'Tinggi',
+                status: 'Terjadwal',
+                fokus: 5,
+                catatan: 'Cut-off nutrisi malam strictly no-carb'
+            },
+            {
+                id: 'opt-' + Date.now() + '-13',
+                tanggal: tgl,
+                mulai: pt.isya,
+                selesai: pt.isyaSelesai,
+                durasi: '0.50',
+                kategori: 'Ibadah / Salat',
+                aktivitas: 'Salat Isya Berjamaah & Doa Malam',
+                output: 'Penutup ibadah fardhu harian, ketenteraman hati menyongsong malam',
+                metode_latihan: 'Non-Latihan',
+                prioritas: 'Tinggi',
+                status: 'Terjadwal',
+                fokus: 5,
+                catatan: `Jadwal Astronomis Realtime (${pt.cityName})`
+            },
+            {
+                id: 'opt-' + Date.now() + '-14',
+                tanggal: tgl,
+                mulai: '20:00',
+                selesai: '20:50',
+                durasi: '0.83',
+                kategori: 'Operasional',
+                aktivitas: 'Evaluasi Jurnal Harian & Perencanaan Strategis Hari Esok',
+                output: 'Review capaian KPI kerja, checklist nutrisi, dan penetapan 3 prioritas esok',
+                metode_latihan: 'Non-Latihan',
+                prioritas: 'Sedang',
+                status: 'Terjadwal',
+                fokus: 4,
+                catatan: 'Penutupan administrasi hari'
+            },
+            {
+                id: 'opt-' + Date.now() + '-15',
+                tanggal: tgl,
+                mulai: '21:00',
+                selesai: '21:30',
+                durasi: '0.50',
+                kategori: 'Kesehatan Biologis & Nutrisi',
+                aktivitas: 'Dekompresi Pasif Fasia: Dead Hang 3x30 Detik, Child Pose & Suplementasi',
+                output: 'Bantalan vertebra L4-L5 meregang bebas gravitasi, relaksasi saraf vagus + magnesium',
+                metode_latihan: 'Non-Latihan',
+                prioritas: 'Tinggi',
+                status: 'Terjadwal',
+                fokus: 5,
+                catatan: 'Protokol tulang belakang & persiapan tidur lelap'
+            },
+            {
+                id: 'opt-' + Date.now() + '-16',
+                tanggal: tgl,
+                mulai: '21:45',
+                selesai: pt.subuh,
+                durasi: '6.33',
+                kategori: 'Kesehatan Biologis & Nutrisi',
+                aktivitas: 'Deep Sleep Pemulihan HGH Puncak (Kegelapan Total & Suhu Sejuk)',
+                output: 'Pelepasan 70-80% hormon pertumbuhan (HGH) untuk memadatkan tulang & regenerasi',
+                metode_latihan: 'Non-Latihan',
+                prioritas: 'Tinggi',
+                status: 'Terjadwal',
+                fokus: 5,
+                catatan: 'Target regenerasi seluler absolut'
+            }
+        ];
+
+        if (replaceExisting) {
+            this.data.tasks = (this.data.tasks || []).filter(t => t.tanggal !== tgl).concat(optimalTasks);
+        } else {
+            this.data.tasks = (this.data.tasks || []).concat(optimalTasks);
+        }
+
+        // Sinkronisasi ke log biologis hari tersebut agar checklist 100% patuh
+        let bioLog = (this.data.bioLogs || []).find(b => b.tanggal === tgl);
+        if (!bioLog) {
+            bioLog = {
+                id: 'bio-auto-' + Date.now(),
+                tanggal: tgl,
+                fase: 'Fase 2 & 3: Remodeling Otot-Tulang',
+                air: 3000,
+                sarapan: '05:45 - 3 Telur Rebus & Karbo Kompleks',
+                makanSiang: '12:30 - Dada Ayam 200g & Nasi 1 Kepal',
+                makanMalam: '18:45 - Ikan Bakar & Sayur Hijau',
+                noCarb: 'Ya',
+                hang: 'Ya (3x30s)',
+                tidurDurasi: 7.0,
+                jamTidur: '21:45',
+                kualitasTidur: 5,
+                nyeriPinggang: 1,
+                tensi: '118/78',
+                posturSkor: 90,
+                catatan: 'Disusun otomatis lewat Protokol Emas Rekonstruksi Biologis.'
+            };
+            this.data.bioLogs.unshift(bioLog);
+        } else {
+            bioLog.air = 3000;
+            bioLog.noCarb = 'Ya';
+            bioLog.hang = 'Ya (3x30s)';
+            bioLog.jamTidur = '21:45';
+        }
+
+        this.data.todayWater = 3000;
+        this.saveState();
+        this.selectedSummaryDate = tgl;
+
+        if (window.supabaseService) {
+            window.supabaseService.fullSync(this.data.tasks, this.data.bioLogs);
+        }
+
+        this.closeAutoScheduleModal();
+        this.renderAll();
+        this.showToast('🚀 Jadwal Optimal 24 Jam (Protokol Emas) Berhasil Diterapkan!');
     }
 
     renderAll() {
