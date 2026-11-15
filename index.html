@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jurnal Aktivitas & Rekonstruksi Biologis Mandiri</title>
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Supabase JavaScript SDK CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+    <!-- Header Aplikasi -->
+    <header class="app-header">
+        <div class="container header-inner">
+            <div class="brand-section">
+                <div class="brand-icon">🧬</div>
+                <div>
+                    <h1 class="brand-title">Jurnal Aktivitas & Rekonstruksi Biologis</h1>
+                    <p class="brand-subtitle">Protokol Peremajaan Seluler, Penataan Postur V-Taper, dan Manajemen Produktivitas Kerja</p>
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <div class="header-status-badge" id="cloud-sync-badge">
+                    <span class="status-dot"></span>
+                    <span>☁️ Menghubungkan Supabase...</span>
+                </div>
+                <div class="header-status-badge">
+                    <span>Fase 2 & 3: Remodeling Otot-Tulang</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigasi Tab -->
+    <div class="nav-tabs-wrapper">
+        <div class="container">
+            <div class="nav-tabs">
+                <button class="nav-tab-btn active" data-tab="jurnal-kerja">📋 Jurnal Kerja</button>
+                <button class="nav-tab-btn tab-bio" data-tab="log-biologis">🧬 Log Biologis & Checklist</button>
+                <button class="nav-tab-btn tab-bio" data-tab="menu-makan">🍽️ Jadwal & Menu Makan</button>
+                <button class="nav-tab-btn tab-bio" data-tab="jadwal-latihan">🏋️ Jadwal & Metode Latihan</button>
+                <button class="nav-tab-btn tab-bio" data-tab="timer-latihan">⏱️ Timer Latihan Kunci</button>
+                <button class="nav-tab-btn" data-tab="dashboard-kpi">📊 Dashboard KPI</button>
+                <button class="nav-tab-btn" data-tab="master-protokol">📖 Jendela Regenerasi</button>
+                <button class="nav-tab-btn" data-tab="ekspor-data">☁️ Supabase & Ekspor</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Kontainer Utama -->
+    <main class="container">
+
+        <!-- ======================================================== -->
+        <!-- TAB 1: JURNAL KERJA (TIMESHEET)                          -->
+        <!-- ======================================================== -->
+        <section id="tab-jurnal-kerja" class="tab-content active">
+            <!-- KPI Summary Cards -->
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Jam Kerja</div>
+                    <div class="kpi-value" id="kpi-total-jam">0.0 Jam</div>
+                    <div class="kpi-subtext">Akumulasi durasi tugas</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Aktivitas</div>
+                    <div class="kpi-value" id="kpi-total-tugas">0</div>
+                    <div class="kpi-subtext">Item tugas tercatat</div>
+                </div>
+                <div class="kpi-card green">
+                    <div class="kpi-label">Tugas Selesai</div>
+                    <div class="kpi-value" id="kpi-tugas-selesai">0</div>
+                    <div class="kpi-subtext">Eksekusi tuntas</div>
+                </div>
+                <div class="kpi-card orange">
+                    <div class="kpi-label">Rasio Penyelesaian</div>
+                    <div class="kpi-value" id="kpi-rasio-selesai">0%</div>
+                    <div class="kpi-subtext">Tingkat keberhasilan</div>
+                </div>
+            </div>
+
+            <!-- Form Tambah / Edit Tugas -->
+            <div class="card" id="card-form-task">
+                <div class="card-header">
+                    <h3 class="card-title" id="title-form-task">➕ Tambah Aktivitas / Tugas Harian</h3>
+                    <span id="badge-edit-mode-task" class="badge badge-warning" style="display: none;">Mode Edit Aktif</span>
+                </div>
+                <form id="form-add-task">
+                    <input type="hidden" id="task-edit-id" value="">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">Tanggal</label>
+                            <input type="date" id="task-tgl" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Jam Mulai</label>
+                            <input type="time" id="task-mulai" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Jam Selesai</label>
+                            <input type="time" id="task-selesai" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Kategori</label>
+                            <select id="task-kategori" class="form-control">
+                                <option value="Pekerjaan Utama">Pekerjaan Utama</option>
+                                <option value="Rapat & Koordinasi">Rapat & Koordinasi</option>
+                                <option value="Riset & Pembelajaran">Riset & Pembelajaran</option>
+                                <option value="Latihan & Olah Tubuh">Latihan & Olah Tubuh</option>
+                                <option value="Nutrisi & Hidrasi Terjadwal">Nutrisi & Hidrasi Terjadwal</option>
+                                <option value="Administrasi & Email">Administrasi & Email</option>
+                                <option value="Perencanaan & Evaluasi">Perencanaan & Evaluasi</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Prioritas</label>
+                            <select id="task-prioritas" class="form-control">
+                                <option value="Tinggi">Tinggi</option>
+                                <option value="Sedang">Sedang</option>
+                                <option value="Rendah">Rendah</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Status</label>
+                            <select id="task-status" class="form-control">
+                                <option value="Selesai">Selesai</option>
+                                <option value="Sedang Berjalan">Sedang Berjalan</option>
+                                <option value="Tertunda">Tertunda</option>
+                                <option value="Dibatalkan">Dibatalkan</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Skor Fokus Mental (1-5)</label>
+                            <select id="task-fokus" class="form-control">
+                                <option value="5">5 - Sangat Fokus & Mengalir</option>
+                                <option value="4">4 - Fokus Baik</option>
+                                <option value="3">3 - Cukup Standar</option>
+                                <option value="2">2 - Terdistraksi</option>
+                                <option value="1">1 - Kelelahan / Low Energy</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-grid">
+                        <div class="form-group" style="grid-column: span 2;">
+                            <label class="form-label">Nama Aktivitas / Rincian Tugas</label>
+                            <input type="text" id="task-nama" class="form-control" placeholder="Contoh: Sesi A Latihan Dada & Bahu atau Review Kode..." required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Metode Latihan (Bila Olah Tubuh)</label>
+                            <select id="task-metode" class="form-control">
+                                <option value="">-- Bukan Sesi Latihan / Umum --</option>
+                                <option value="Adaptasi 70% Kemampuan (Minggu I - Hindari Failure)">Adaptasi 70% Kemampuan (Minggu I - Hindari Failure)</option>
+                                <option value="Tempo Terkontrol 2-1-1 (Mind-Muscle Connection)">Tempo Terkontrol 2-1-1 (Mind-Muscle Connection)</option>
+                                <option value="Isometrik Korset Perut (Transversus Abdominis)">Isometrik Korset Perut (Transversus Abdominis)</option>
+                                <option value="Dekompresi Pasif Fasia & Tulang Belakang (Dead Hang)">Dekompresi Pasif Fasia & Tulang Belakang (Dead Hang)</option>
+                                <option value="Zone 2 Pemulihan Aktif & Drainase Limfatik">Zone 2 Pemulihan Aktif & Drainase Limfatik</option>
+                                <option value="Porsi Penuh 100% & Beban Progresif (Progresi Lanjutan)">Porsi Penuh 100% & Beban Progresif (Progresi Lanjutan)</option>
+                                <option value="Mobilitas Dinamis & Peregangan Sendi (Cobra & Rotasi)">Mobilitas Dinamis & Peregangan Sendi (Cobra & Rotasi)</option>
+                                <option value="Non-Latihan Fisik (Aktivitas Kerja / Harian)">Non-Latihan Fisik (Aktivitas Kerja / Harian)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Output / Deliverable Nyata</label>
+                            <input type="text" id="task-output" class="form-control" placeholder="Contoh: Endpoint API lulus pengujian atau 3 set tuntas...">
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 16px;">
+                        <label class="form-label">Kendala / Catatan Tindak Lanjut</label>
+                        <input type="text" id="task-catatan" class="form-control" placeholder="Catatan evaluasi atau blocker...">
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <button type="submit" id="btn-submit-task" class="btn btn-primary">➕ Simpan ke Jurnal Kerja & Sinkron Cloud</button>
+                        <button type="button" id="btn-cancel-task-edit" class="btn btn-outline" style="display: none;" onclick="window.app.cancelEditTask()">✖ Batal Edit</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Tabel Daftar Tugas -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">📑 Riwayat Aktivitas & Timesheet</h3>
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Tanggal</th>
+                                <th>Waktu & Durasi</th>
+                                <th>Kategori</th>
+                                <th>Aktivitas & Output</th>
+                                <th>Metode Latihan</th>
+                                <th>Prioritas</th>
+                                <th>Status</th>
+                                <th>Fokus</th>
+                                <th>Catatan</th>
+                                <th style="text-align: center; min-width: 140px;">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="task-table-body">
+                            <!-- Diisi oleh JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ======================================================== -->
+        <!-- TAB 2: LOG BIOLOGIS & CHECKLIST HARIAN                   -->
+        <!-- ======================================================== -->
+        <section id="tab-log-biologis" class="tab-content">
+            <!-- Box Tracker Hidrasi Hari Ini -->
+            <div class="hydration-box">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                    <div>
+                        <h3 style="color: var(--primary-green); margin-bottom: 2px;">💧 Pelacak Hidrasi Seluler Harian</h3>
+                        <p style="font-size: 0.85rem; color: var(--text-secondary);">Target: 2.500 – 3.000 ml per hari (diminum bertahap 300–500 ml/jam)</p>
+                    </div>
+                    <div style="font-size: 1.15rem; font-weight: 800; color: var(--primary-green);" id="hydration-text-value">
+                        0 ml / 3.000 ml (0%)
+                    </div>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" id="hydration-progress-fill"></div>
+                </div>
+                <div class="quick-hydrate-buttons">
+                    <button class="btn btn-sm btn-green btn-add-water" data-amount="250">+250 ml (Gelas)</button>
+                    <button class="btn btn-sm btn-green btn-add-water" data-amount="300">+300 ml</button>
+                    <button class="btn btn-sm btn-green btn-add-water" data-amount="500">+500 ml (Botol)</button>
+                    <button class="btn btn-sm btn-outline" id="btn-reset-water">Reset Hari Ini</button>
+                </div>
+            </div>
+
+            <!-- Checklist Terpadu Jadwal Makan & Sesi Latihan Hari Ini -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 22px;">
+                <!-- Checklist Jadwal Makan -->
+                <div class="card" style="margin-bottom: 0;">
+                    <div class="card-header" style="margin-bottom: 12px; padding-bottom: 8px;">
+                        <h4 class="card-title green" style="font-size: 0.95rem;">✅ Checklist Jadwal Makan Hari Ini</h4>
+                        <span class="badge badge-info" id="meal-checklist-counter">0 / 6 Tuntas</span>
+                    </div>
+                    <div class="space-y-2 text-xs" id="daily-meal-checklist-container">
+                        <!-- Diisi oleh JS -->
+                    </div>
+                </div>
+
+                <!-- Checklist Sesi Latihan Hari Ini -->
+                <div class="card" style="margin-bottom: 0;">
+                    <div class="card-header" style="margin-bottom: 12px; padding-bottom: 8px;">
+                        <h4 class="card-title" style="font-size: 0.95rem;" id="workout-checklist-title">🏋️ Sesi Latihan Hari Ini</h4>
+                        <span class="badge badge-success" id="workout-day-badge">Senin (Sesi A)</span>
+                    </div>
+                    <div class="space-y-2 text-xs" id="daily-workout-checklist-container">
+                        <!-- Diisi oleh JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Form Tambah / Edit Log Biologis -->
+            <div class="card" id="card-form-bio">
+                <div class="card-header">
+                    <h3 class="card-title green" id="title-form-bio">🧬 Rekam Parameter Rekonstruksi Tubuh Harian</h3>
+                    <span id="badge-edit-mode-bio" class="badge badge-warning" style="display: none;">Mode Edit Aktif</span>
+                </div>
+                <form id="form-add-bio">
+                    <input type="hidden" id="bio-edit-id" value="">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">Tanggal</label>
+                            <input type="date" id="bio-tgl" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Sesi Latihan Harian</label>
+                            <select id="bio-sesi" class="form-control">
+                                <option value="Sesi A: Dada, Bahu & Six-Pack">Sesi A: Dada, Bahu & Six-Pack</option>
+                                <option value="Sesi B: Sayap, Punggung & Korset">Sesi B: Sayap, Punggung & Korset</option>
+                                <option value="Pemulihan Aktif (Fasia & Lemak)">Pemulihan Aktif (Fasia & Lemak)</option>
+                                <option value="Mobilitas: Kelenturan Sendi & Kardio">Mobilitas: Kelenturan Sendi & Kardio</option>
+                                <option value="Istirahat Total (Rekonstruksi Tulang)">Istirahat Total (Rekonstruksi Tulang)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Metode Eksekusi Latihan</label>
+                            <select id="bio-metode" class="form-control">
+                                <option value="Adaptasi 70% Kemampuan (Minggu I - Hindari Failure)">Adaptasi 70% Kemampuan (Minggu I - Hindari Failure)</option>
+                                <option value="Tempo Terkontrol 2-1-1 (Mind-Muscle Connection)">Tempo Terkontrol 2-1-1 (Mind-Muscle Connection)</option>
+                                <option value="Isometrik Korset Perut (Transversus Abdominis)">Isometrik Korset Perut (Transversus Abdominis)</option>
+                                <option value="Dekompresi Pasif Fasia & Tulang Belakang (Dead Hang)">Dekompresi Pasif Fasia & Tulang Belakang (Dead Hang)</option>
+                                <option value="Zone 2 Pemulihan Aktif & Drainase Limfatik">Zone 2 Pemulihan Aktif & Drainase Limfatik</option>
+                                <option value="Porsi Penuh 100% & Beban Progresif (Progresi Lanjutan)">Porsi Penuh 100% & Beban Progresif (Progresi Lanjutan)</option>
+                                <option value="Mobilitas Dinamis & Peregangan Sendi (Cobra & Rotasi)">Mobilitas Dinamis & Peregangan Sendi (Cobra & Rotasi)</option>
+                                <option value="Non-Latihan Fisik (Aktivitas Kerja / Harian)">Non-Latihan Fisik (Aktivitas Kerja / Harian)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Kepatuhan Sesi Latihan</label>
+                            <select id="bio-patuh" class="form-control">
+                                <option value="Selesai Penuh (100%)">Selesai Penuh (100%)</option>
+                                <option value="Adaptasi (70% Porsi)">Adaptasi (70% Porsi)</option>
+                                <option value="Terlewat / Belum">Terlewat / Belum</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Stomach Vacuum</label>
+                            <input type="text" id="bio-vacuum" class="form-control" value="5 set x 15 detik" placeholder="5 set x 15 detik">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Dead Hang & Dekompresi</label>
+                            <input type="text" id="bio-hang" class="form-control" value="Ya (Dead Hang 3x30s & Child)" placeholder="Ya / Tidak">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Total Air Hari Ini (ml)</label>
+                            <input type="number" id="bio-air" class="form-control" value="2800" min="500" max="6000" step="100">
+                        </div>
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">Elektrolit Pagi (Air Garam)</label>
+                            <select id="bio-elektrolit" class="form-control">
+                                <option value="Ya">Ya (Air Hangat + Garam Mineral)</option>
+                                <option value="Tidak">Tidak</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Jam Makan Malam (Cut-Off)</label>
+                            <input type="time" id="bio-mm" class="form-control" value="19:15">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Malam Tanpa Nasi/Tepung (Autofagi)</label>
+                            <select id="bio-nocarb" class="form-control">
+                                <option value="Ya">Ya (70% Protein, 30% Sayur Hijau)</option>
+                                <option value="Tidak">Tidak</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Jam Masuk Tidur (Target &le; 22.00)</label>
+                            <input type="time" id="bio-tidur" class="form-control" value="21:45">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Jam Bangun Pagi</label>
+                            <input type="time" id="bio-bangun" class="form-control" value="05:30">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Sensasi Punggung (Vaskularisasi)</label>
+                            <select id="bio-sensasi" class="form-control">
+                                <option value="Hangat / Pegal Termogenesis (Normal)">Hangat / Pegal Termogenesis (Normal)</option>
+                                <option value="Ringan / Segar Tanpa Beban">Ringan / Segar Tanpa Beban</option>
+                                <option value="Kencang / Perlu Peregangan">Kencang / Perlu Peregangan</option>
+                                <option value="Nyeri Tajam Menjalar (Bahaya Medis)">Nyeri Tajam Menjalar (Bahaya Medis)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">Lingkar Perut (cm)</label>
+                            <input type="number" id="bio-perut" class="form-control" step="0.1" placeholder="Misal 86.5">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Berat Badan (kg)</label>
+                            <input type="number" id="bio-bb" class="form-control" step="0.1" placeholder="Misal 72.0">
+                        </div>
+                        <div class="form-group" style="grid-column: span 2;">
+                            <label class="form-label">Status Batas Medis (Red Flags)</label>
+                            <select id="bio-flag" class="form-control">
+                                <option value="Aman & Terkendali">Aman & Terkendali (Sesuai Adaptasi Fisiologis)</option>
+                                <option value="Perlu Waspada">Perlu Waspada (Istirahat & Hidrasi Ekstra)</option>
+                                <option value="Red Flag Medis (Periksa)">Red Flag Medis (Demam / Nyeri Tajam / Sesak)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 16px;">
+                        <label class="form-label">Catatan Respons Tubuh & Evaluasi Wajah</label>
+                        <input type="text" id="bio-note" class="form-control" placeholder="Contoh: Sembab wajah berkurang, postur tegak terasa kokoh...">
+                    </div>
+
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <button type="submit" id="btn-submit-bio" class="btn btn-green">🧬 Simpan Log Biologis & Sinkron Cloud</button>
+                        <button type="button" id="btn-cancel-bio-edit" class="btn btn-outline" style="display: none;" onclick="window.app.cancelEditBioLog()">✖ Batal Edit</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Tabel Riwayat Biologis -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title green">📋 Riwayat Parameter Fisiologis & Rekonstruksi</h3>
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Tanggal</th>
+                                <th>Sesi Latihan</th>
+                                <th>Hidrasi</th>
+                                <th>Korset / Hang</th>
+                                <th>Makan Malam & Jeda</th>
+                                <th>Tidur & Durasi</th>
+                                <th>Puncak HGH</th>
+                                <th>Perut & BB</th>
+                                <th>Sensasi Punggung</th>
+                                <th>Status</th>
+                                <th style="text-align: center; min-width: 140px;">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bio-table-body">
+                            <!-- Diisi oleh JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ======================================================== -->
+        <!-- TAB 3: JADWAL & MENU MAKAN (NUTRISI & AUTOFAGI)          -->
+        <!-- ======================================================== -->
+        <section id="tab-menu-makan" class="tab-content">
+            <!-- Alert Filosofi Nutrisi -->
+            <div class="alert alert-info" style="border-left: 4px solid var(--primary-green);">
+                <span>🥗 <strong>Prinsip Nutrisi Biologis:</strong> Menjaga kestabilan metabolisme basal (BMR) di siang hari dengan protein tinggi dan serat, serta menghentikan karbohidrat/tepung minimal 2,5 jam sebelum tidur untuk memicu <em>Autofagi</em> dan pelepasan hormon <em>Human Growth Hormone (HGH)</em> saat tidur lelap.</span>
+            </div>
+
+            <!-- Master Timeline Jadwal Makan Harian -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title green">⏰ Master Ritme Makan & Hidrasi Harian (05.30 – 21.30 WIB)</h3>
+                    <span class="badge badge-success">Target 2.500 – 3.000 ml Air</span>
+                </div>
+                <div class="space-y-4" id="container-timeline-makan">
+                    <!-- Diisi otomatis oleh JavaScript dari MASTER_PROTOKOL.ritmeMakan -->
+                </div>
+            </div>
+
+            <!-- Menu Fokus Mingguan 7 Hari -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">🍽️ Menu Fokus Mingguan & Strategi Lauk Harian (Senin – Minggu)</h3>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px;" id="container-menu-mingguan">
+                    <!-- Diisi otomatis oleh JavaScript dari MASTER_PROTOKOL.menuMingguan -->
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ======================================================== -->
+        <!-- TAB 4: JADWAL & METODE LATIHAN (V-TAPER & SIX-PACK)       -->
+        <!-- ======================================================== -->
+        <section id="tab-jadwal-latihan" class="tab-content">
+            <!-- Alert Intensitas & Panduan Minggu Pertama -->
+            <div class="alert alert-warning">
+                <span>⚠️ <strong>Protokol Minggu Pertama:</strong> Lakukan dengan intensitas <strong>70% kemampuan</strong> pada 3–4 hari pertama hingga rasa pegal/panas di punggung mereda secara wajar, lalu naikkan ke porsi penuh. Istirahat antar-set: <strong>60 detik</strong>.</span>
+            </div>
+
+            <!-- Pemilih Hari Interaktif -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">📅 Jadwal Latihan V-Taper & Rekomposisi Tubuh (Pukul 16.30 - 17.15 WIB)</h3>
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap;" id="filter-hari-latihan">
+                        <button onclick="window.app.renderWorkoutDay('Senin')" class="btn btn-sm btn-primary btn-day-filter" data-day="Senin">Senin</button>
+                        <button onclick="window.app.renderWorkoutDay('Selasa')" class="btn btn-sm btn-outline btn-day-filter" data-day="Selasa">Selasa</button>
+                        <button onclick="window.app.renderWorkoutDay('Rabu')" class="btn btn-sm btn-outline btn-day-filter" data-day="Rabu">Rabu</button>
+                        <button onclick="window.app.renderWorkoutDay('Kamis')" class="btn btn-sm btn-outline btn-day-filter" data-day="Kamis">Kamis</button>
+                        <button onclick="window.app.renderWorkoutDay('Jumat')" class="btn btn-sm btn-outline btn-day-filter" data-day="Jumat">Jumat</button>
+                        <button onclick="window.app.renderWorkoutDay('Sabtu')" class="btn btn-sm btn-outline btn-day-filter" data-day="Sabtu">Sabtu</button>
+                        <button onclick="window.app.renderWorkoutDay('Minggu')" class="btn btn-sm btn-outline btn-day-filter" data-day="Minggu">Minggu</button>
+                    </div>
+                </div>
+
+                <!-- Konten Sesi Latihan Hari Terpilih -->
+                <div id="workout-day-detail-container">
+                    <!-- Diisi dinamis oleh JavaScript -->
+                </div>
+            </div>
+
+            <!-- Katalog Pilihan Metode Latihan Terstandarisasi Sesuai PDF -->
+            <div class="card" style="border-left: 4px solid var(--accent-blue);">
+                <div class="card-header">
+                    <h3 class="card-title" style="color: var(--accent-blue);">🏋️ Katalog Pilihan Metode Latihan & Prinsip Eksekusi Biologis</h3>
+                    <span class="badge badge-primary">8 Metode Terintegrasi</span>
+                </div>
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 14px;">
+                    Metode ini tersedia di dropdown formulir <strong>Jurnal Kerja</strong> dan <strong>Log Biologis</strong> untuk menjamin akurasi tracking beban dan intensitas harian sesuai panduan PDF rekonstruksi tubuh.
+                </p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px;" id="container-katalog-metode">
+                    <!-- Diisi otomatis oleh JavaScript -->
+                </div>
+            </div>
+
+            <!-- Panduan Teknis 3 Gerakan Kunci -->
+            <div class="card" style="border-left: 4px solid var(--primary-green);">
+                <div class="card-header">
+                    <h3 class="card-title green">🎯 Panduan Teknis 3 Gerakan Kunci Penyelaras Postur & Perut</h3>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px;" id="container-gerakan-kunci">
+                    <!-- Diisi otomatis oleh JavaScript -->
+                </div>
+            </div>
+
+            <!-- Indikator Batas Aman Medis & Red Flags -->
+            <div class="card" style="border-left: 4px solid var(--accent-red);">
+                <div class="card-header">
+                    <h3 class="card-title" style="color: var(--accent-red);">🚨 Indikator Keberhasilan & Batas Aman Medis (Red Flags)</h3>
+                </div>
+                <div class="space-y-3 text-xs" style="line-height: 1.6;">
+                    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 12px; border-radius: 8px;">
+                        <h4 style="color: #15803d; font-weight: bold; margin-bottom: 4px;">✅ Tanda Rekonstruksi Tuntas (Baseline Baru):</h4>
+                        <p id="medis-tanda-tuntas" style="color: #166534; margin: 0;"></p>
+                    </div>
+                    <div style="background: #fef2f2; border: 1px solid #fecaca; padding: 12px; border-radius: 8px;">
+                        <h4 style="color: #b91c1c; font-weight: bold; margin-bottom: 4px;">🛑 Kapan Harus ke Dokter (Red Flags):</h4>
+                        <p id="medis-red-flags" style="color: #991b1b; margin: 0;"></p>
+                    </div>
+                    <div style="background: #fffbeb; border: 1px solid #fde68a; padding: 12px; border-radius: 8px;">
+                        <h4 style="color: #b45309; font-weight: bold; margin-bottom: 4px;">💡 Penanganan Pegal & Panas di Punggung:</h4>
+                        <p id="medis-penanganan" style="color: #92400e; margin: 0;"></p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ======================================================== -->
+        <!-- TAB 5: TIMER LATIHAN KUNCI                               -->
+        <!-- ======================================================== -->
+        <section id="tab-timer-latihan" class="tab-content">
+            <div class="card" style="text-align: center;">
+                <h3 class="card-title green" style="justify-content: center; margin-bottom: 6px;">⏱️ Timer Interaktif Gerakan Kunci</h3>
+                <p style="color: var(--text-secondary); font-size: 0.9rem;">Dilengkapi panduan fase napas dan sinyal audio ritme pergerakan.</p>
+
+                <div style="display: flex; justify-content: center; gap: 10px; margin: 18px 0; flex-wrap: wrap;">
+                    <button class="btn btn-green btn-timer-mode" data-mode="vacuum">Stomach Vacuum (5x15s)</button>
+                    <button class="btn btn-outline btn-timer-mode" data-mode="hang">Dead Hang (3x30s)</button>
+                    <button class="btn btn-outline btn-timer-mode" data-mode="ytw">Prone Y-T-W (3x20s)</button>
+                </div>
+
+                <div class="timer-container">
+                    <div class="timer-circle" id="timer-circle">
+                        <div class="timer-time" id="timer-time-display">15</div>
+                        <div class="timer-phase" id="timer-phase-display">SIAP</div>
+                    </div>
+                    <div style="font-weight: 700; color: var(--primary-navy); margin-bottom: 8px;" id="timer-set-display">Set 1 dari 5</div>
+                    <div class="timer-instruction" id="timer-instruction-text">
+                        Buang napas habis lewat mulut, tarik pusar sedalam mungkin ke arah tulang belakang (perut kempis maksimal). Tahan sambil bernapas tipis.
+                    </div>
+                    <div style="display: flex; gap: 12px; margin-top: 10px;">
+                        <button class="btn btn-green" id="btn-timer-start">▶ Mulai</button>
+                        <button class="btn btn-outline" id="btn-timer-reset">🔄 Reset</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ======================================================== -->
+        <!-- TAB 6: DASHBOARD KPI & ANALITIK                          -->
+        <!-- ======================================================== -->
+        <section id="tab-dashboard-kpi" class="tab-content">
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Jam Kerja Terdata</div>
+                    <div class="kpi-value" id="dash-total-jam">0.0 Jam</div>
+                    <div class="kpi-subtext">Akumulasi seluruh tugas</div>
+                </div>
+                <div class="kpi-card green">
+                    <div class="kpi-label">Rata-rata Hidrasi Harian</div>
+                    <div class="kpi-value" id="dash-avg-air">0 ml</div>
+                    <div class="kpi-subtext">Target: 2.500 - 3.000 ml</div>
+                </div>
+                <div class="kpi-card purple">
+                    <div class="kpi-label">Rata-rata Durasi Tidur</div>
+                    <div class="kpi-value" id="dash-avg-tidur">0.0 Jam</div>
+                    <div class="kpi-subtext">Target: 7,5 - 8,0 Jam</div>
+                </div>
+                <div class="kpi-card orange">
+                    <div class="kpi-label">Kepatuhan Cut-Off Malam</div>
+                    <div class="kpi-value" id="dash-cutoff-rate">0%</div>
+                    <div class="kpi-subtext">Bebas karbohidrat malam</div>
+                </div>
+                <div class="kpi-card purple">
+                    <div class="kpi-label">Rasio Puncak HGH (&le;22.00)</div>
+                    <div class="kpi-value" id="dash-hgh-rate">0%</div>
+                    <div class="kpi-subtext">Tidur tepat waktu</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Rata-rata Skor Fokus</div>
+                    <div class="kpi-value" id="dash-avg-fokus">0.0 / 5.0</div>
+                    <div class="kpi-subtext">Kualitas konsentrasi mental</div>
+                </div>
+            </div>
+
+            <!-- Distribusi Jam Kerja per Kategori -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">📊 Distribusi Jam Kerja Berdasarkan Kategori</h3>
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Kategori Aktivitas</th>
+                                <th style="text-align: right;">Total Durasi</th>
+                                <th style="text-align: right;">Persentase Alokasi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dash-cat-tbody">
+                            <!-- Diisi oleh JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ======================================================== -->
+        <!-- TAB 7: MASTER PROTOKOL RISET                             -->
+        <!-- ======================================================== -->
+        <section id="tab-master-protokol" class="tab-content">
+            <div class="alert alert-info">
+                <span>ℹ️ <strong>Rujukan Resmi:</strong> Seluruh data di bawah ini diekstrak langsung dari <em>Dokumen Catatan Kesehatan & Rekonstruksi Biologis Mandiri</em> (15 November 2026).</span>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title green">⏳ Jendela Waktu Regenerasi Biologis (Berdasarkan Riset)</h3>
+                </div>
+                <div id="protokol-jendela-container">
+                    <!-- Diisi oleh JS -->
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ======================================================== -->
+        <!-- TAB 8: SUPABASE CLOUD & CADANGAN                         -->
+        <!-- ======================================================== -->
+        <section id="tab-ekspor-data" class="tab-content">
+            <div class="card" style="border-left: 4px solid var(--primary-green);">
+                <div class="card-header">
+                    <h3 class="card-title green">☁️ Integrasi Database Supabase Cloud</h3>
+                </div>
+                <p style="color: var(--text-secondary); margin-bottom: 14px;">
+                    Aplikasi ini telah terhubung langsung ke proyek database Supabase Anda. Seluruh penambahan, pengubahan, dan penghapusan data akan otomatis tersinkronisasi ke cloud Postgres.
+                </p>
+                <div style="background: #f8fafc; padding: 14px; border-radius: var(--radius-md); font-family: monospace; font-size: 0.85rem; margin-bottom: 16px;">
+                    <div><strong>Project URL :</strong> https://nwjpukscnwbrnjohleco.supabase.co</div>
+                    <div><strong>Tabel Aktif :</strong> public.jurnal_kerja, public.log_biologis</div>
+                    <div><strong>Keamanan    :</strong> Row Level Security (RLS) Diaktifkan</div>
+                </div>
+                <button class="btn btn-green" id="btn-sync-cloud">
+                    ☁️ Sinkronkan ke Supabase Sekarang
+                </button>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">💾 Ekspor Data Lokal ke File</h3>
+                </div>
+                <p style="color: var(--text-secondary); margin-bottom: 20px;">
+                    Unduh rekaman aktivitas dan log biologis Anda dalam format CSV (kompatibel penuh dengan Microsoft Excel, Google Sheets) atau simpan cadangan file JSON.
+                </p>
+
+                <div style="display: flex; gap: 14px; flex-wrap: wrap;">
+                    <button class="btn btn-primary" id="btn-export-kerja-csv">
+                        📥 Unduh CSV Jurnal Kerja (Excel)
+                    </button>
+                    <button class="btn btn-green" id="btn-export-bio-csv">
+                        📥 Unduh CSV Log Biologis (Excel)
+                    </button>
+                    <button class="btn btn-outline" id="btn-export-backup-json">
+                        💾 Unduh File Cadangan Lengkap (.json)
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Scripts -->
+    <script src="js/data-master.js"></script>
+    <script src="js/timer.js"></script>
+    <script src="js/export.js"></script>
+    <script src="js/supabase-client.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
