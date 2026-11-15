@@ -1513,10 +1513,14 @@ class AppManager {
         }
 
         // 3. UPDATE SCORECARD METRIK HARIAN
+        this.currentUnifiedEvents = unifiedEvents;
         const totalAgenda = unifiedEvents.length;
         const selesaiCount = unifiedEvents.filter(e => e.status === 'Selesai').length;
         const pctSelesai = totalAgenda > 0 ? Math.round((selesaiCount / totalAgenda) * 100) : 0;
         const totalHours = unifiedEvents.reduce((acc, cur) => acc + parseFloat(cur.durasi || 0), 0);
+        const workCount = unifiedEvents.filter(e => e.kategori === 'Kerja').length;
+        const workoutCount = unifiedEvents.filter(e => e.kategori === 'Latihan').length;
+        const salatCount = unifiedEvents.filter(e => e.kategori === 'Salat').length;
 
         const elTotalAgenda = document.getElementById('summary-kpi-total-agenda');
         const elTotalSub = document.getElementById('summary-kpi-total-subtext');
@@ -1529,7 +1533,7 @@ class AppManager {
         const bannerText = document.getElementById('summary-conflict-banner-text');
 
         if (elTotalAgenda) elTotalAgenda.innerText = totalAgenda;
-        if (elTotalSub) elTotalSub.innerText = `${rawTasks.length} Tugas Mandiri • ${totalAgenda - rawTasks.length} Ritme Biologis`;
+        if (elTotalSub) elTotalSub.innerText = `${workCount} Kerja • ${workoutCount} Latihan • ${salatCount} Salat 5 Waktu`;
         if (elSelesai) elSelesai.innerText = `${selesaiCount} / ${totalAgenda} (${pctSelesai}%)`;
         if (elTotalJam) elTotalJam.innerText = `${totalHours.toFixed(1)} Jam`;
 
@@ -1888,6 +1892,46 @@ ${conflictsCount === 0
 
     printDailyReport() {
         window.print();
+    }
+
+    exportSummaryScheduleExcel() {
+        if (!this.currentUnifiedEvents || this.currentUnifiedEvents.length === 0) {
+            this.showToast('⚠️ Belum ada jadwal pada tanggal ini untuk diekspor.');
+            return;
+        }
+
+        const dateObj = new Date(this.selectedSummaryDate + 'T00:00:00');
+        const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+        const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+        const formattedDate = !isNaN(dateObj.getTime())
+            ? `${dayNames[dateObj.getDay()]}, ${dateObj.getDate()} ${monthNames[dateObj.getMonth()]} ${dateObj.getFullYear()}`
+            : this.selectedSummaryDate;
+
+        const totalAgenda = this.currentUnifiedEvents.length;
+        const selesaiCount = this.currentUnifiedEvents.filter(e => e.status === 'Selesai').length;
+        const pctSelesai = totalAgenda > 0 ? Math.round((selesaiCount / totalAgenda) * 100) : 0;
+        const totalHours = this.currentUnifiedEvents.reduce((acc, cur) => acc + parseFloat(cur.durasi || 0), 0);
+        const conflictsCount = this.currentUnifiedEvents.filter(e => e.conflictsWith && e.conflictsWith.length > 0).length;
+
+        let prayerTimes = null;
+        if (window.prayerManager) {
+            prayerTimes = window.prayerManager.calculate(this.selectedSummaryDate);
+        }
+
+        const metadata = {
+            rawDate: this.selectedSummaryDate,
+            formattedDate: formattedDate,
+            cityName: window.prayerManager?.getCityConfig()?.name || 'DKI Jakarta (WIB)',
+            totalAgenda: totalAgenda,
+            selesaiCount: selesaiCount,
+            pctSelesai: pctSelesai,
+            totalHours: totalHours,
+            totalConflictsCount: conflictsCount,
+            prayerTimes: prayerTimes
+        };
+
+        DataExporter.exportSummaryScheduleExcel(this.currentUnifiedEvents, metadata);
+        this.showToast('📊 Summary jadwal harian berhasil diekspor ke Excel!');
     }
 
     openAutoScheduleModal() {

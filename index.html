@@ -113,6 +113,9 @@
                         <button class="btn btn-sm btn-green" id="btn-open-auto-schedule" onclick="window.app.openAutoScheduleModal()" style="font-weight: 800; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.3);">
                             <span>⚡ Susun Jadwal Optimal (Protokol Emas)</span>
                         </button>
+                        <button class="btn btn-sm btn-outline" id="btn-header-export-excel" onclick="window.app.exportSummaryScheduleExcel()" style="color: #047857; border-color: #6ee7b7; background: #ecfdf5; font-weight: 700; display: inline-flex; align-items: center; gap: 5px;" title="Unduh jadwal terpadu hari ini ke Microsoft Excel (.xls)">
+                            <span>📊 Ekspor Excel</span>
+                        </button>
                         <button class="btn btn-sm btn-outline" id="btn-open-reset-schedule" onclick="window.app.openResetScheduleModal()" style="color: #dc2626; border-color: #fca5a5; font-weight: 700; display: inline-flex; align-items: center; gap: 5px;">
                             <span>🗑️ Reset Jadwal</span>
                         </button>
@@ -203,6 +206,9 @@
                             <!-- Diisi dinamis oleh JavaScript -->
                         </div>
                         <div style="display: flex; gap: 8px; flex-direction: column;">
+                            <button class="btn btn-sm btn-green" id="btn-export-summary-excel" onclick="window.app.exportSummaryScheduleExcel()" style="display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 800; background: #059669; border-color: #059669; color: #ffffff; box-shadow: 0 4px 6px -1px rgba(5, 150, 105, 0.25);">
+                                <span>📊 Unduh Summary Jadwal ke Excel (.xls)</span>
+                            </button>
                             <button class="btn btn-sm btn-outline" id="btn-copy-daily-report" onclick="window.app.copyDailySummaryReport()" style="display: flex; align-items: center; justify-content: center; gap: 6px;">
                                 <span>📋 Salin Rapor (Format WhatsApp / Teks)</span>
                             </button>
@@ -915,6 +921,9 @@
                     </button>
                     <button class="btn btn-green" id="btn-export-bio-csv">
                         📥 Unduh CSV Log Biologis (Excel)
+                    </button>
+                    <button class="btn btn-outline" id="btn-export-summary-dashboard-excel" onclick="window.app.exportSummaryScheduleExcel()" style="color: #047857; border-color: #10b981; font-weight: 700;">
+                        📊 Unduh Excel Summary Jadwal Dashboard (.xls)
                     </button>
                     <button class="btn btn-outline" id="btn-export-backup-json">
                         💾 Unduh File Cadangan Lengkap (.json)
