@@ -39,6 +39,10 @@ class PrayerTimesManager {
             this.selectedCityKey = cityKey;
             localStorage.setItem('jurnal_prayer_city', cityKey);
             this.updateClockAndPrayer();
+            const el1 = document.getElementById('prayer-city-select');
+            if (el1 && el1.value !== cityKey) el1.value = cityKey;
+            const el2 = document.getElementById('auto-sched-city');
+            if (el2 && el2.value !== cityKey) el2.value = cityKey;
             if (window.app) {
                 window.app.renderSummaryDashboard();
             }
@@ -142,29 +146,33 @@ class PrayerTimesManager {
         const now = new Date();
         const city = this.getCityConfig();
 
+        // Hitung waktu presisi sesuai offset zona waktu terpilih (WIB=UTC+7, WITA=UTC+8, WIT=UTC+9)
+        const utcMs = now.getTime() + (now.getTimezoneOffset() * 60000);
+        const targetDate = new Date(utcMs + (city.tz * 3600000));
+
         // Realtime Clock Display
-        const hours = String(now.getHours()).padStart(2, '0');
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        const seconds = String(now.getSeconds()).padStart(2, '0');
+        const hours = String(targetDate.getHours()).padStart(2, '0');
+        const minutes = String(targetDate.getMinutes()).padStart(2, '0');
+        const seconds = String(targetDate.getSeconds()).padStart(2, '0');
         const tzAbbr = city.tz === 7 ? 'WIB' : (city.tz === 8 ? 'WITA' : 'WIT');
         const clockStr = `${hours}:${minutes}:${seconds} ${tzAbbr}`;
 
         const elClock = document.getElementById('realtime-clock-display');
         if (elClock) elClock.innerText = clockStr;
 
-        // Current date in Indonesian
+        // Current date in Indonesian (sesuai kalender zona waktu target)
         const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
         const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-        const dateStr = `${days[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
+        const dateStr = `${days[targetDate.getDay()]}, ${targetDate.getDate()} ${months[targetDate.getMonth()]} ${targetDate.getFullYear()}`;
         const elDate = document.getElementById('realtime-date-display');
         if (elDate) elDate.innerText = dateStr;
 
-        // Prayer times for today
-        const pt = this.calculate(now);
+        // Prayer times for target date
+        const pt = this.calculate(targetDate);
         this.currentTimes = pt;
 
-        // Determine Next Prayer & Countdown
-        const nowMins = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+        // Determine Next Prayer & Countdown based on target timezone minutes
+        const nowMins = targetDate.getHours() * 60 + targetDate.getMinutes() + targetDate.getSeconds() / 60;
         const toMins = timeStr => {
             const [h, m] = timeStr.split(':').map(Number);
             return h * 60 + m;
